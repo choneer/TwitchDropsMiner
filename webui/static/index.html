@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Drop Harbor · Twitch Drops</title>
+    <link rel="stylesheet" href="/assets/app.css" />
+    <script src="/assets/app.js" defer></script>
+  </head>
+  <body>
+    <section id="login" class="login-shell">
+      <form id="login-form" class="login-card">
+        <div class="brand-mark">DH</div>
+        <p class="eyebrow">YOUR DROPS, IN ONE PLACE</p>
+        <h1>Drop Harbor</h1>
+        <p class="muted">让奖励靠岸。登录你的私人掉宝控制台。</p>
+        <label for="password">控制台访问密码</label
+        ><input
+          id="password"
+          type="password"
+          autocomplete="current-password"
+          required
+          minlength="16"
+          maxlength="72"
+          autofocus
+        />
+        <p id="login-error" role="alert" class="error-text"></p>
+        <button class="primary full" type="submit">
+          进入控制台 <span>→</span></button
+        ><small>这是 NAS 网页密码，不是 Twitch 密码。仅在可信网络使用。</small>
+      </form>
+    </section>
+    <div id="console" class="app-shell" hidden>
+      <aside>
+        <a class="brand" href="/"
+          ><span class="brand-mark small">DH</span
+          ><span>Drop Harbor<small>TWITCH DROPS CONSOLE</small></span></a
+        >
+        <nav aria-label="主导航">
+          <button class="nav active" data-page="overview">
+            ◈ <span>运行总览</span></button
+          ><button class="nav" data-page="campaigns">
+            ▦ <span>掉宝活动</span></button
+          ><button class="nav" data-page="settings">
+            ☷ <span>游戏与设置</span></button
+          ><button class="nav" data-page="logs">≡ <span>运行日志</span></button>
+        </nav>
+        <div class="sidebar-foot">
+          <span class="dot"></span> 原生 Web · 无远程桌面<br /><small
+            >独立社区 fork / 单账号</small
+          >
+        </div>
+      </aside>
+      <div class="workspace">
+        <header>
+          <div>
+            <p class="eyebrow">YOUR PERSONAL DROP STATION</p>
+            <h1 id="page-title">运行总览</h1>
+          </div>
+          <div class="header-right">
+            <span id="connection" class="badge">正在连接</span
+            ><button id="logout" class="ghost">退出登录</button>
+          </div>
+        </header>
+        <main>
+          <div id="notice" role="status" hidden></div>
+          <section id="overview" class="page">
+            <div class="hero">
+              <div>
+                <p class="eyebrow">AUTOMATION, WITH VISIBILITY</p>
+                <h2>保持连接，<br />不错过下一份奖励。</h2>
+                <p id="runtime-status">等待后台启动</p>
+                <div class="actions">
+                  <button class="primary" data-action="start">
+                    启动 / 连接 Twitch</button
+                  ><button data-action="reload">重新加载</button
+                  ><button class="ghost" data-action="stop">停止服务</button>
+                </div>
+              </div>
+              <div class="orbit" aria-hidden="true">
+                <span>✦</span>
+                <div>DROP<br /><strong>HARBOR</strong></div>
+              </div>
+            </div>
+            <div class="stats">
+              <article>
+                <span>后台状态</span><strong id="phase">—</strong
+                ><small id="uptime">尚未启动</small>
+              </article>
+              <article>
+                <span>当前可参与活动</span><strong id="stat-active">0</strong
+                ><small>已关联账号且正在进行</small>
+              </article>
+              <article>
+                <span>当前列表已领取</span><strong id="stat-claimed">0</strong
+                ><small>按 Twitch 返回状态统计</small>
+              </article>
+              <article>
+                <span>Twitch 账号</span
+                ><strong id="account-state">未登录</strong
+                ><small id="account-id">使用官方设备授权</small>
+              </article>
+            </div>
+            <div id="device-card" class="panel authorization" hidden>
+              <div>
+                <p class="eyebrow">CONNECT YOUR ACCOUNT</p>
+                <h2>在 Twitch 完成设备授权</h2>
+                <p>
+                  无需把 Twitch 密码交给
+                  NAS。使用你自己的浏览器打开官方授权页，输入下方代码。
+                </p>
+                <p class="muted">
+                  代码过期时页面会更新。只有你主动完成授权后，才会登录账号。
+                </p>
+              </div>
+              <div>
+                <code id="device-code"></code
+                ><a
+                  class="button primary"
+                  href="https://www.twitch.tv/activate"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >打开 Twitch 授权页 ↗</a
+                >
+              </div>
+            </div>
+            <div id="runtime-error" class="panel danger" hidden>
+              <h2>后台需要处理</h2>
+              <p>服务不会无限重试登录。请查看错误原因后，再点击重新加载。</p>
+              <pre id="error-detail"></pre>
+            </div>
+            <div class="two-columns">
+              <article class="panel">
+                <div class="section-title">
+                  <h2>正在进行</h2>
+                  <span class="badge" id="watching-name">暂无频道</span>
+                </div>
+                <div id="current-drop" class="empty">
+                  尚无掉宝任务。连接账号后，在“游戏与设置”中添加优先游戏。
+                </div>
+              </article>
+              <article class="panel">
+                <div class="section-title">
+                  <h2>最近动态</h2>
+                  <button data-open="logs" class="text-button">
+                    全部日志 →
+                  </button>
+                </div>
+                <div id="recent-logs" class="recent-list">
+                  <p class="muted">等待服务事件</p>
+                </div>
+              </article>
+            </div>
+            <article class="panel">
+              <div class="section-title">
+                <h2>可用频道</h2>
+                <small>切换操作仍遵守原核心的游戏与掉宝资格判断</small>
+              </div>
+              <div id="channel-list" class="channel-list empty">暂无频道</div>
+            </article>
+          </section>
+          <section id="campaigns" class="page" hidden>
+            <div class="section-title">
+              <div>
+                <h2>你的下一份奖励</h2>
+                <p class="muted">
+                  活动资格、进度及领取结果来自 Twitch，不在网页中模拟。
+                </p>
+              </div>
+              <button data-action="reload">刷新活动</button>
+            </div>
+            <div class="filters">
+              <input
+                id="campaign-search"
+                type="search"
+                placeholder="搜索游戏或活动"
+                aria-label="搜索活动"
+              /><select id="campaign-filter" aria-label="活动状态">
+                <option value="all">全部活动</option>
+                <option value="active">进行中</option>
+                <option value="upcoming">即将开始</option>
+                <option value="eligible">可参与</option>
+              </select>
+            </div>
+            <div id="campaign-grid" class="campaign-grid"></div>
+          </section>
+          <section id="settings" class="page" hidden>
+            <div class="section-title">
+              <div>
+                <h2>按你的节奏收集</h2>
+                <p class="muted">
+                  保存后重新加载，使全部更改应用到运行中的任务。
+                </p>
+              </div>
+            </div>
+            <form id="settings-form">
+              <div class="two-columns">
+                <article class="panel">
+                  <h2>游戏优先级</h2>
+                  <p class="muted">
+                    从上到下依次优先。默认只运行这里选中的游戏。
+                  </p>
+                  <div class="inline-form">
+                    <input
+                      id="game-input"
+                      list="game-options"
+                      placeholder="输入或选择游戏名称"
+                    /><datalist id="game-options"></datalist
+                    ><button id="add-game" type="button">添加</button>
+                  </div>
+                  <ol id="priority-list" class="priority-list"></ol>
+                </article>
+                <article class="panel">
+                  <h2>排除游戏</h2>
+                  <p class="muted">
+                    每行一个完整游戏名。排除列表优先于自动选择。
+                  </p>
+                  <textarea
+                    id="excluded"
+                    rows="7"
+                    placeholder="每行一个游戏名称"
+                  ></textarea
+                  ><label for="priority-mode">未指定游戏的选择方式</label
+                  ><select id="priority-mode">
+                    <option value="PRIORITY_ONLY">仅优先级列表（推荐）</option>
+                    <option value="ENDING_SOONEST">
+                      其他游戏按活动截止时间
+                    </option>
+                    <option value="LOW_AVBL_FIRST">
+                      其他游戏按剩余时间紧迫度
+                    </option>
+                  </select>
+                </article>
+              </div>
+              <article class="panel settings-options">
+                <div>
+                  <label for="language">核心消息语言</label
+                  ><select id="language"></select>
+                </div>
+                <div>
+                  <label for="quality">连接质量 / 超时倍率</label
+                  ><select id="quality">
+                    <option value="1">1 · 默认</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6 · 较长等待</option>
+                  </select>
+                </div>
+                <label class="check"
+                  ><input
+                    id="badges"
+                    type="checkbox"
+                  />允许徽章与表情奖励</label
+                ><label class="check"
+                  ><input
+                    id="drop-check"
+                    type="checkbox"
+                  />额外检查频道掉宝标记</label
+                >
+              </article>
+              <div class="actions">
+                <button class="primary" type="submit">保存设置</button
+                ><button data-action="reload" type="button">重新加载服务</button
+                ><span id="save-result" role="status"></span>
+              </div>
+            </form>
+          </section>
+          <section id="logs" class="page" hidden>
+            <div class="section-title">
+              <div>
+                <h2>看见后台发生了什么</h2>
+                <p class="muted">
+                  页面保留最近 500 条；磁盘日志按 2MB × 4
+                  个文件轮转。敏感凭据自动脱敏。
+                </p>
+              </div>
+              <select id="log-filter" aria-label="日志级别">
+                <option value="all">全部级别</option>
+                <option value="error">错误与警告</option>
+              </select>
+            </div>
+            <div id="log-list" class="log-list" aria-live="polite"></div>
+          </section>
+          <footer>
+            Drop Harbor · Native WebUI
+            <span>非 Twitch 官方工具 · 不保证持续掉宝或零账号风险</span>
+          </footer>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

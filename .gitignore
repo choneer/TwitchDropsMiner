@@ -29,3 +29,5 @@ settings.json
 /docker/.env
 /docker/*.secret
 /docker/data/
+/docker/data-web/
+/.venv-web/

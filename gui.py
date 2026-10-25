@@ -595,7 +595,7 @@ class LoginForm:
                 continue
             return login_data
 
-    async def ask_enter_code(self, page_url: URL, user_code: str) -> None:
+    async def ask_enter_code(self, page_url: URL, user_code: str, *, expires_at=None) -> None:
         self.update(_("gui", "login", "required"), None)
         # ensure the window isn't hidden into tray when this runs
         self._manager.grab_attention(sound=False)

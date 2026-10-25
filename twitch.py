@@ -16,7 +16,6 @@ import aiohttp
 from yarl import URL
 
 from translate import _
-from gui import GUIManager
 from channel import Channel
 from websocket import WebsocketPool
 from inventory import DropsCampaign
@@ -159,26 +158,35 @@ class _AuthState:
                     expires_at = now + timedelta(seconds=response_json["expires_in"])
 
                 # Print the code to the user, open them the activate page so they can type it in
-                await login_form.ask_enter_code(verification_uri, user_code)
+                await login_form.ask_enter_code(verification_uri, user_code, expires_at=expires_at)
 
-                payload = {
+                token_payload = {
                     "client_id": self._twitch._client_type.CLIENT_ID,
                     "device_code": device_code,
                     "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
                 }
                 while True:
                     # sleep first, not like the user is gonna enter the code *that* fast
-                    await asyncio.sleep(interval)
+                    await self._twitch.gui.coro_unless_closed(asyncio.sleep(interval))
                     async with self._twitch.request(
                         "POST",
                         "https://id.twitch.tv/oauth2/token",
                         headers=headers,
-                        data=payload,
+                        data=token_payload,
                         invalidate_after=expires_at,
                     ) as response:
-                        # 200 means success, 400 means the user haven't entered the code yet
+                        # Pending is expected; denied/expired/rate-limited are not the same.
                         if response.status != 200:
-                            continue
+                            failure = await response.json()
+                            error = failure.get("error", failure.get("message", ""))
+                            if error == "authorization_pending":
+                                continue
+                            if error == "slow_down" or response.status == 429:
+                                interval += 5
+                                continue
+                            if error == "expired_token":
+                                raise RequestInvalid()
+                            raise LoginException(f"Device authorization failed: HTTP {response.status}")
                         response_json = await response.json()
                         # {
                         #     "access_token": "40 chars [A-Za-z0-9]",
@@ -431,7 +439,7 @@ class _AuthState:
 
 
 class Twitch:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, *, gui_factory=None):
         self.settings: Settings = settings
         # State management
         self._state: State = State.IDLE
@@ -449,7 +457,10 @@ class Twitch:
         self._session: aiohttp.ClientSession | None = None
         self._auth_state: _AuthState = _AuthState(self)
         # GUI
-        self.gui = GUIManager(self)
+        if gui_factory is None:
+            from gui import GUIManager
+            gui_factory = GUIManager
+        self.gui = gui_factory(self)
         # Storing and watching channels
         self.channels: OrderedDict[int, Channel] = OrderedDict()
         self.watching_channel: AwaitableValue[Channel] = AwaitableValue()

@@ -1,0 +1,17 @@
+FROM python:3.11-slim-bookworm
+LABEL org.opencontainers.image.source="https://github.com/choneer/TwitchDropsMiner" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.title="Drop Harbor - Native Twitch Drops WebUI"
+ENV TDM_DATA_DIR=/data PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 HOME=/data
+WORKDIR /opt/tdm
+COPY requirements-web.txt ./
+RUN pip install --no-cache-dir -r requirements-web.txt
+COPY *.py LICENSE ./
+COPY lang ./lang
+COPY webui ./webui
+COPY docker/web-entrypoint.py /opt/container/entrypoint.py
+EXPOSE 8080
+VOLUME ["/data"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; op=urllib.request.build_opener(urllib.request.ProxyHandler({})); assert op.open('http://127.0.0.1:8080/healthz', timeout=3).status == 200"]
+ENTRYPOINT ["python", "/opt/container/entrypoint.py"]

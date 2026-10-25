@@ -1,5 +1,9 @@
 # Twitch Drops Miner
 
+> **Native WebUI:** this branch adds Drop Harbor, a real responsive web interface
+> without VNC or a desktop. [中文部署与迁移说明](docker/README.web.zh-CN.md).
+> Its image tag is `web`; the previous desktop image/tag `docker` is kept separate.
+
 > This fork adds experimental Docker/noVNC support, maintained independently of
 > DevilXD. See [Docker deployment (中文)](docker/README.zh-CN.md). Upstream's
 > project goals below are preserved; please report container issues to this fork.

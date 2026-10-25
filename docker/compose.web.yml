@@ -1,0 +1,27 @@
+name: twitchdropsminer-web
+services:
+  twitchdropsminer-web:
+    image: ghcr.io/choneer/twitchdropsminer:web
+    build:
+      context: ..
+      dockerfile: Dockerfile.web
+    container_name: twitchdropsminer-web
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 150s
+    ports:
+      - "${BIND_IP:-127.0.0.1}:${WEB_PORT:-4444}:8080"
+    volumes:
+      - "${DATA_PATH:-./data-web}:/data"
+    secrets:
+      - web_password
+    environment:
+      TZ: Asia/Shanghai
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+secrets:
+  web_password:
+    file: ./web-password.secret

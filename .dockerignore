@@ -1,7 +1,10 @@
 *
 !Dockerfile
+!Dockerfile.web
 !LICENSE
 !requirements.txt
+!requirements-web.txt
+!webui/**
 !*.py
 !icons/**
 !lang/**
@@ -10,4 +13,5 @@ docker/*.secret
 docker/.env
 docker/data
 docker/data/**
+docker/data-web/**
 **/__pycache__
