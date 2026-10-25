@@ -635,7 +635,7 @@ main {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 22px;
-  align-items: start;
+  align-items: stretch;
 }
 .catalog-status {
   color: var(--muted);
@@ -662,6 +662,8 @@ main {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: white;
+  display: flex;
+  flex-direction: column;
 }
 .campaign-head {
   padding: 24px 22px;
@@ -670,6 +672,8 @@ main {
   gap: 16px;
   background: #f8f8fb;
   border-bottom: 1px solid #eeedf3;
+  min-height: 130px;
+  box-sizing: border-box;
 }
 .campaign-head img {
   width: 52px;
@@ -687,7 +691,27 @@ main {
 }
 .campaign-body {
   padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
+.reward-scroll {
+  height: 390px;
+  flex: 0 0 390px;
+  margin-top: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #c3bddc transparent;
+  scrollbar-gutter: stable;
+  overscroll-behavior-y: contain;
+  padding-right: 8px;
+}
+.reward-scroll::-webkit-scrollbar { width: 6px; }
+.reward-scroll::-webkit-scrollbar-thumb { background: #c3bddc; border-radius: 8px; }
+.reward-scroll:focus-visible { outline: 2px solid #a79bd5; outline-offset: 3px; }
+.reward-scroll > .reward { min-height: 130px; box-sizing: border-box; }
+.reward-toggle { flex-shrink: 0; }
 .campaign-body > a {
   display: inline-block;
   font-size: 11px;
