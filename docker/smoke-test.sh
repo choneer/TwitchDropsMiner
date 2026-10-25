@@ -29,6 +29,9 @@ for attempt in $(seq 1 60); do
         ready=true
         break
     fi
+    if docker exec "$name" supervisorctl -c /opt/container/supervisord.conf status miner 2>/dev/null | grep -q FATAL; then
+        break
+    fi
     sleep 2
 done
 if [ "$ready" != true ]; then

@@ -3,7 +3,7 @@ import subprocess
 import urllib.error
 import urllib.request
 
-for name in ("display", "desktop", "vnc", "websocket", "miner", "web"):
+for name in ("display", "desktop", "panel", "vnc", "websocket", "miner", "web"):
     result = subprocess.run(
         ["supervisorctl", "-c", "/opt/container/supervisord.conf", "status", name],
         capture_output=True, text=True, timeout=3,

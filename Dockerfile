@@ -5,15 +5,16 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 XMODIFIERS=@im=none
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates python3 python3-venv python3-tk python3-gi \
+    ca-certificates python3 python3-venv python3-tk python3-gi python3-pil.imagetk \
     gir1.2-gtk-3.0 python3-dev libgirepository1.0-dev libcairo2-dev \
-    pkg-config gcc libc6-dev xvfb x11-utils x11vnc openbox dbus-x11 \
+    pkg-config gcc libc6-dev xvfb x11-utils x11vnc openbox tint2 dbus-x11 \
     novnc websockify nginx apache2-utils supervisor fonts-noto-cjk tini \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --uid 1000 --create-home --home-dir /data miner \
     && python3 -m venv --system-site-packages /opt/venv
 COPY requirements.txt /tmp/requirements.txt
-RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
+RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt \
+    && /opt/venv/bin/python -c 'import PIL.ImageTk, tkinter, gi, truststore'
 WORKDIR /opt/tdm
 COPY *.py ./
 COPY icons ./icons
