@@ -75,6 +75,17 @@ subprocess.run([sys.executable, '-c',
     "assert constants.COOKIES_PATH == constants.WORKING_DIR / 'cookies.jar'"],
     env=desktop_env, check=True)
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args):
+        return None
+redirect_opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+try:
+    redirect_opener.open('http://127.0.0.1:8080/', timeout=5)
+except urllib.error.HTTPError as exc:
+    assert exc.code == 302
+    assert exc.headers['Location'] == '/vnc.html?autoconnect=1&resize=remote'
+else:
+    raise AssertionError('Expected a relative homepage redirect')
 for path in ('/vnc.html', '/websockify'):
     try:
         opener.open('http://127.0.0.1:8080' + path)
