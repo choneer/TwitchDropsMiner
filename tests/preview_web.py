@@ -44,10 +44,10 @@ class PreviewWorker:
                 'startAt': iso(now-timedelta(days=1)), 'endAt': iso(now+timedelta(days=5)),
                 'status': 'ACTIVE', 'allow': {'channels': [], 'isEnabled': False},
                 'timeBasedDrops': []}
-            for number in range(2):
+            for number in range(6 if index == 1 else 2):
                 data['timeBasedDrops'].append({'id': f'{index}-{number}', 'name': '测试奖励',
                     'benefitEdges': [{'benefit': {'id': f'benefit-{index}-{number}',
-                        'name': ['探索者补给箱', '星辉限定徽章'][number],
+                        'name': ['探索者补给箱', '星辉限定徽章'][number % 2],
                         'distributionType': 'DIRECT_ENTITLEMENT', 'imageAssetURL': ''}}],
                     'startAt': data['startAt'], 'endAt': data['endAt'], 'preconditionDrops': [],
                     'requiredMinutesWatched': 60*(number+1),

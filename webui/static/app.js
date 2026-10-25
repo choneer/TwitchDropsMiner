@@ -7,6 +7,7 @@ const phases = {
   stopping: "停止中",
   error: "需要处理",
 };
+const expandedRewards = new Set();
 let csrf = "",
   model = null,
   priority = [],
@@ -257,31 +258,43 @@ function renderCampaigns() {
   $("catalog-status").className = "catalog-status" + (discovery?.status === "error" ? " warning" : "");
   const list = model.campaigns.filter((c) => CampaignView.matches(c, filter, q))
     .sort((a, b) => Number(b.active) - Number(a.active) || new Date(a.ends_at) - new Date(b.ends_at));
-  const pages = Math.max(1, Math.ceil(list.length / 12));
+  const pageSize = Number($("campaign-page-size").value);
+  const pages = Math.max(1, Math.ceil(list.length / pageSize));
   campaignPage = Math.min(campaignPage, pages - 1);
   $("campaign-count").textContent = `共 ${list.length} 个活动 · ${campaignPage + 1} / ${pages} 页`;
   $("campaign-prev").disabled = campaignPage === 0;
   $("campaign-next").disabled = campaignPage === pages - 1;
   const html = list.length
-    ? list.slice(campaignPage * 12, (campaignPage + 1) * 12)
+    ? list.slice(campaignPage * pageSize, (campaignPage + 1) * pageSize)
         .map((c) => {
           const art = image(c.image),
             url = link(c.link_url);
           const linkage = c.linked === null ? "账号关联状态待 Twitch 确认" : c.linked ? "账号已关联" : "需要关联游戏账号";
           return `<article class="campaign"><div class="campaign-head">${art ? `<img src="${esc(art)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><span class="badge ${c.finished ? "good" : ""}">${CampaignView.status(c)}</span><h3>${esc(c.game)}</h3><small>${esc(c.name)}</small></div></div><div class="campaign-body"><small>${c.catalog_only ? "公开活动目录 · 账号进度待同步" : "Twitch 账号数据"}</small><div class="reward-line"><span>${linkage}</span><span>${esc(date(c.ends_at))} 截止</span></div>${c.linked !== true && url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">前往关联账号 ↗</a>` : ""}${!c.finished && !c.expired && c.watchable ? `<button type="button" class="choose-game" data-game="${esc(c.game)}">加入优先游戏</button>` : ""}${c.drops
+            .slice(0, expandedRewards.has(c.id) ? c.drops.length : 3)
             .map((d) => {
               const reward = image(d.benefits[0]?.image);
               if (d.required_subs > 0) return `<div class="reward"><div class="reward-top">${reward ? `<img src="${esc(reward)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><strong>${esc(d.rewards || d.name)}</strong><small>${d.claimed ? "已领取" : `需要订阅 ${d.required_subs} 次 · 无法通过挂机完成`}</small></div></div></div>`;
               const known = d.progress_known !== false;
               return `<div class="reward"><div class="reward-top">${reward ? `<img src="${esc(reward)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><strong>${esc(d.rewards || d.name)}</strong><small>${d.claimed ? "已领取" : d.claimable ? "等待核心自动领取" : known ? "累计观看时长" : "尚未取得账号进度"}</small></div></div>${known ? `<div class="meter"><progress max="100" value="${pct(d.progress)}" aria-label="奖励进度"></progress></div><div class="reward-line"><span>${d.minutes} / ${d.required_minutes} 分钟${d.minutes !== d.confirmed_minutes ? " · 含估算" : ""}</span><span>${pct(d.progress)}%</span></div>` : `<p class="muted">需要观看 ${d.required_minutes} 分钟 · 当前进度未知</p>`}</div>`;
             })
-            .join("")}</div></article>`;
+            .join("")}${c.drops.length > 3 ? `<button type="button" class="reward-toggle" data-reward-toggle="${esc(c.id)}" aria-expanded="${expandedRewards.has(c.id)}">${expandedRewards.has(c.id) ? "收起奖励" : `查看更多 · 还有 ${c.drops.length - 3} 个奖励`}<span aria-hidden="true">⌄</span></button>` : ""}</div></article>`;
         })
         .join("")
     : `<div class="panel empty">${esc(CampaignView.empty(model.account.authenticated, discovery, model.campaigns.length > 0))}</div>`;
   if (campaignMarkup !== html) { $("campaign-grid").innerHTML = html; campaignMarkup = html; }
 }
 $("campaign-grid").addEventListener("click", (event) => {
+  const toggle = event.target.closest("[data-reward-toggle]");
+  if (toggle) {
+    const id = toggle.dataset.rewardToggle;
+    if (expandedRewards.has(id)) expandedRewards.delete(id);
+    else expandedRewards.add(id);
+    renderCampaigns();
+    Array.from(document.querySelectorAll("[data-reward-toggle]"))
+      .find((button) => button.dataset.rewardToggle === id)?.focus({ preventScroll: true });
+    return;
+  }
   const button = event.target.closest("[data-game]");
   if (button) { addGame(button.dataset.game); page("settings"); notice("已加入待保存列表；点击保存设置，再重新加载以生效。"); }
 });
@@ -289,6 +302,7 @@ for (const [id, event] of [["campaign-search", "input"], ["campaign-filter", "ch
   $(id).addEventListener(event, () => { campaignPage = 0; renderCampaigns(); });
 $("campaign-prev").addEventListener("click", () => { campaignPage--; renderCampaigns(); });
 $("campaign-next").addEventListener("click", () => { campaignPage++; renderCampaigns(); });
+$("campaign-page-size").addEventListener("change", () => { campaignPage = 0; renderCampaigns(); });
 function loadSettings() {
   const s = model.settings;
   priority = [...s.priority];
