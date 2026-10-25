@@ -10,7 +10,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates python3 python3-venv python3-tk python3-gi python3-pil.imagetk \
-    gir1.2-gtk-3.0 python3-dev libgirepository1.0-dev libcairo2-dev \
+    gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1 gir1.2-notify-0.7 \
+    at-spi2-core xfce4-notifyd python3-dev libgirepository1.0-dev libcairo2-dev \
     pkg-config gcc libc6-dev xvfb x11-utils x11vnc openbox tint2 dbus-x11 \
     novnc websockify nginx apache2-utils supervisor fonts-noto-cjk tini \
     && rm -rf /var/lib/apt/lists/* \
