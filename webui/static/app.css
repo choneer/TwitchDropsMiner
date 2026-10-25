@@ -666,6 +666,10 @@ main {
   display: flex;
   flex-direction: column;
 }
+.campaign.campaign-priority { border-color: #beb4e4; box-shadow: 0 0 0 1px #ece8f8; }
+.campaign-priority .campaign-head { background: #f3f0fb; }
+.badge.priority-badge { margin-left: 6px; margin-top: 4px; color: #6250aa; background: #ebe6fa; border-color: #d8cff0; }
+.choose-game.priority-added:disabled { opacity: 1; color: #6250aa; background: #f3f0fb; border-color: #ded6f1; cursor: default; }
 .campaign-head {
   padding: 24px 22px;
   display: flex;
