@@ -31,7 +31,12 @@ for attempt in $(seq 1 60); do
     fi
     sleep 2
 done
-test "$ready" = true
+if [ "$ready" != true ]; then
+    docker inspect --format '{{json .State.Health}}' "$name"
+    docker exec "$name" supervisorctl -c /opt/container/supervisord.conf status || true
+    docker exec --user miner "$name" timeout 10 /opt/container/start-miner.sh || true
+    exit 1
+fi
 docker exec -i "$name" /opt/venv/bin/python - <<'PY'
 import base64
 import socket
