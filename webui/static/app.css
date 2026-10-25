@@ -711,7 +711,6 @@ main {
 .reward-scroll::-webkit-scrollbar-thumb { background: #c3bddc; border-radius: 8px; }
 .reward-scroll:focus-visible { outline: 2px solid #a79bd5; outline-offset: 3px; }
 .reward-scroll > .reward { min-height: 130px; box-sizing: border-box; }
-.reward-toggle { flex-shrink: 0; }
 .campaign-body > a {
   display: inline-block;
   font-size: 11px;
@@ -725,23 +724,6 @@ main {
   padding-bottom: 4px;
   border: 0;
 }
-.reward-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  margin-top: 16px;
-  padding: 10px 12px;
-  border: 0;
-  background: #f6f5fa;
-  color: #6556b3;
-  box-shadow: none;
-  font-size: 12px;
-}
-.reward-toggle:hover { background: #eeebf7; }
-.reward-toggle span { font-size: 17px; line-height: 1; }
-.reward-toggle[aria-expanded="true"] span { transform: rotate(180deg); }
 .reward-top {
   display: flex;
   gap: 12px;
