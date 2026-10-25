@@ -37,6 +37,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=native-web
       - name: Offline unit and API integration tests
         run: docker run --rm --network none --entrypoint python -v "$PWD/tests:/tests:ro" -e TDM_DATA_DIR=/tmp/test-data tdm-web:test -m unittest discover -s /tests -v
+      - name: Campaign presentation regression tests
+        run: node --test tests/campaigns.test.cjs
       - name: Offline deployment smoke
         run: bash docker/smoke-web.sh tdm-web:test
       - uses: docker/build-push-action@v6

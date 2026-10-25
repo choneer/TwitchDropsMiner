@@ -480,6 +480,8 @@ class Twitch:
         self._state_change = asyncio.Event()
         self.wanted_games: list[Game] = []
         self.inventory: list[DropsCampaign] = []
+        self.discovery = {'source': 'twitch', 'status': 'not_loaded', 'updated_at': None,
+                          'count': 0, 'message': '尚未获取活动'}
         self._drops: dict[str, TimedDrop] = {}
         self._campaigns: dict[str, DropsCampaign] = {}
         self._mnt_triggers: deque[datetime] = deque()
@@ -691,7 +693,10 @@ class Twitch:
                 # ensure the websocket is running
                 await self.websocket.start()
                 await self.fetch_inventory()
-                self.gui.set_games(set(campaign.game for campaign in self.inventory))
+                self.gui.set_games(set(campaign.game for campaign in self.inventory
+                                       if not campaign.expired and not campaign.finished
+                                       and any(d.required_minutes > 0 and d.required_subs == 0
+                                               and not d.is_claimed for d in campaign.drops)))
                 # Save state on every inventory fetch
                 self.save()
                 self.change_state(State.GAMES_UPDATE)
@@ -1478,11 +1483,30 @@ class Twitch:
             for c in available_list
             if c["status"] in applicable_statuses  # that are currently not expired
         }
+        self.discovery = {'source': 'twitch', 'status': 'ok',
+                          'updated_at': datetime.now(timezone.utc).isoformat(),
+                          'count': len(available_campaigns), 'message': '活动目录来自 Twitch'}
+        if self._client_type is ClientType.SMARTBOX:
+            from campaign_catalog import fetch_catalog, merge_account_campaigns
+            try:
+                public, updated = await fetch_catalog(self.settings.proxy)
+                # Twitch account data always wins. Never import catalog self/progress.
+                inventory_data = merge_account_campaigns(inventory_data, public)
+                self.discovery = {'source': 'public_catalog', 'status': 'ok', 'updated_at': updated,
+                                  'count': len(public),
+                                  'message': '活动目录由公开数据补全；账号关联、进度和领取以 Twitch 为准'}
+                logger.info(f'公开活动目录已加载：{len(public)} 个活动；账号数据仍来自 Twitch')
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError) as exc:
+                # Do not repeat arbitrary external response bodies in logs.
+                self.discovery = {'source': 'public_catalog', 'status': 'error', 'updated_at': None,
+                                  'count': 0, 'message': '完整活动目录暂不可用，当前仅显示 Twitch 已返回的活动；请刷新重试'}
+                logger.warning(f'公开活动目录不可用（{type(exc).__name__}）；当前列表可能不完整')
         # fetch detailed data for each campaign, in chunks
         status_update(_("gui", "status", "fetching_campaigns"))
         fetch_campaigns_tasks: list[asyncio.Task[Any]] = [
             asyncio.create_task(self.fetch_campaigns(campaigns_chunk))
             for campaigns_chunk in chunk(available_campaigns.items(), 20)
+            if self._client_type is not ClientType.SMARTBOX
         ]
         try:
             for coro in asyncio.as_completed(fetch_campaigns_tasks):

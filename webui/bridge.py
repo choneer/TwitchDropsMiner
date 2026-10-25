@@ -15,7 +15,9 @@ def drop_view(drop):
         'id': drop.id, 'name': drop.name, 'rewards': drop.rewards_text(),
         'minutes': drop.current_minutes, 'confirmed_minutes': drop.real_current_minutes,
         'required_minutes': drop.required_minutes, 'progress': drop.progress,
+        'required_subs': getattr(drop, 'required_subs', 0),
         'claimed': drop.is_claimed, 'claimable': drop.can_claim,
+        'progress_known': getattr(drop, 'progress_known', True) or drop.is_claimed,
         'benefits': [{'name': b.name, 'image': str(b.image_url)} for b in drop.benefits],
     }
 
@@ -239,7 +241,12 @@ class WebBridge:
         campaigns = []
         for c in self.inv.campaigns.values():
             campaigns.append({'id': c.id, 'name': c.name, 'game': c.game.name,
-                'image': str(c.image_url), 'linked': c.linked, 'eligible': c.eligible,
+                'image': str(c.image_url), 'linked': c.linked,
+                'eligible': bool(c.eligible and not c.catalog_only),
+                'catalog_only': c.catalog_only, 'finished': c.finished,
+                'watchable': any(d.required_minutes > 0 and d.required_subs == 0
+                                 and not d.is_claimed for d in c.drops),
+                'in_inventory': not c.catalog_only, 'earnable': c.can_earn() and not c.finished,
                 'starts_at': c.starts_at.isoformat(), 'ends_at': c.ends_at.isoformat(),
                 'active': c.active, 'upcoming': c.upcoming, 'expired': c.expired,
                 'link_url': c.link_url, 'drops': [drop_view(d) for d in c.drops]})
@@ -248,6 +255,7 @@ class WebBridge:
                 'authenticated': bool(logged_in and logged_in.is_set()),
                 'user_id': self.login.user_id, 'device': self.login.device},
                 'games': self.games, 'campaigns': campaigns,
+                'discovery': getattr(self._twitch, 'discovery', None),
                 'channels': [channel_view(c) for c in self.channels.entries.values()],
                 'watching': channel_view(self.channels.watching) if self.channels.watching else None,
                 'drop': drop_view(self.progress.drop) if self.progress.drop else None,

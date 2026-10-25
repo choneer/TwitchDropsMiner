@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Drop Harbor · Twitch Drops</title>
     <link rel="stylesheet" href="/assets/app.css" />
+    <script src="/assets/campaigns.js" defer></script>
     <script src="/assets/app.js" defer></script>
   </head>
   <body>
@@ -132,8 +133,8 @@
                 ><small id="uptime">尚未启动</small>
               </article>
               <article>
-                <span>当前可参与活动</span><strong id="stat-active">0</strong
-                ><small>已关联账号且正在进行</small>
+                <span>开放且未完成活动</span><strong id="stat-active">0</strong
+                ><small>参与资格以 Twitch 账号状态为准</small>
               </article>
               <article>
                 <span>当前列表已领取</span><strong id="stat-claimed">0</strong
@@ -206,13 +207,14 @@
           <section id="campaigns" class="page" hidden>
             <div class="section-title">
               <div>
-                <h2>你的下一份奖励</h2>
+                <h2>发现掉宝活动</h2>
                 <p class="muted">
-                  活动资格、进度及领取结果来自 Twitch，不在网页中模拟。
+                  浏览已开放的活动；已领取奖励可在“背包活动”或“已全部领取”中查看。
                 </p>
               </div>
               <button data-action="reload">刷新活动</button>
             </div>
+            <p id="catalog-status" class="catalog-status" role="status"></p>
             <div class="filters">
               <input
                 id="campaign-search"
@@ -220,13 +222,21 @@
                 placeholder="搜索游戏或活动"
                 aria-label="搜索活动"
               /><select id="campaign-filter" aria-label="活动状态">
-                <option value="all">全部活动</option>
-                <option value="active">进行中</option>
+                <option value="open">已开放 · 未完成</option>
                 <option value="upcoming">即将开始</option>
-                <option value="eligible">可参与</option>
+                <option value="eligible">已确认可参与</option>
+                <option value="inventory">背包活动</option>
+                <option value="finished">已全部领取</option>
+                <option value="expired">已结束</option>
+                <option value="all">全部活动</option>
               </select>
             </div>
             <div id="campaign-grid" class="campaign-grid"></div>
+            <div class="pagination">
+              <button id="campaign-prev" type="button">上一页</button>
+              <span id="campaign-count" aria-live="polite"></span>
+              <button id="campaign-next" type="button">下一页</button>
+            </div>
           </section>
           <section id="settings" class="page" hidden>
             <div class="section-title">
@@ -254,6 +264,8 @@
                     ><button id="add-game" type="button">添加</button>
                   </div>
                   <ol id="priority-list" class="priority-list"></ol>
+                  <p id="game-hint" class="muted" aria-live="polite"></p>
+                  <div id="game-suggestions" class="game-suggestions" aria-label="匹配的游戏"></div>
                 </article>
                 <article class="panel">
                   <h2>排除游戏</h2>

@@ -635,7 +635,26 @@ main {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 22px;
+  align-items: start;
 }
+.catalog-status {
+  color: var(--muted);
+  background: #f8f8fb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.catalog-status.warning { color: #995b21; background: #fffaf1; }
+.campaign-grid > .empty { grid-column: 1 / -1; }
+.pagination { display: flex; align-items: center; justify-content: center; gap: 16px; margin: 24px 0; }
+.pagination span { color: var(--muted); font-size: 12px; }
+.choose-game { display: block; margin-top: 14px; }
+.game-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.game-suggestions button { font-size: 12px; padding: 7px 10px; text-align: left; }
+.campaign-head > div { min-width: 0; overflow-wrap: anywhere; }
+.campaign-body .reward-line { flex-wrap: wrap; }
 .campaign {
   overflow: hidden;
   border: 1px solid var(--line);

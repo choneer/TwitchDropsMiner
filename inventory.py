@@ -224,6 +224,8 @@ class TimedDrop(BaseDrop):
             "self" in data and data["self"]["currentMinutesWatched"] or 0
         )
         self.required_minutes: int = data["requiredMinutesWatched"]
+        self.required_subs: int = data.get('requiredSubs', 0)
+        self.progress_known = isinstance(data.get('self'), dict) or self.is_claimed
         self.extra_current_minutes: int = 0
         if self.is_claimed:
             # claimed drops may report inconsistent current minutes, so we need to overwrite them
@@ -289,6 +291,7 @@ class TimedDrop(BaseDrop):
         return (
             super()._base_earn_conditions()
             and self.required_minutes > 0
+            and self.required_subs == 0
             # NOTE: This may be a bad idea, as it invalidates the can_earn status
             # and provides no way to recover from this state until the next reload.
             and self.extra_current_minutes < MAX_EXTRA_MINUTES
@@ -327,6 +330,7 @@ class TimedDrop(BaseDrop):
         self._twitch.gui.display_drop(self, countdown=countdown, subone=subone)
 
     def update_minutes(self, new_minutes: int):
+        self.progress_known = True
         delta: int = new_minutes - self.real_current_minutes
         if self.real_current_minutes + delta < 0:
             delta = -self.real_current_minutes
@@ -341,7 +345,8 @@ class DropsCampaign:
         self.id: str = data["id"]
         self.name: str = data["name"]
         self.game: Game = Game(data["game"])
-        self.linked: bool = data["self"]["isAccountConnected"]
+        self.linked: bool | None = data["self"]["isAccountConnected"]
+        self.catalog_only = data.get('_catalog_only', False)
         self.link_url: str = data["accountLinkURL"]
         # campaign's image actually comes from the game object
         # we use regex to get rid of the dimensions part (ex. ".../game_id-285x380.jpg")
@@ -395,7 +400,10 @@ class DropsCampaign:
     def eligible(self) -> bool:
         if self.has_badge_or_emote:
             return self._twitch.settings.enable_badges_emotes
-        return self.linked
+        # Public metadata cannot establish linkage. Allow a selected campaign to
+        # be attempted; Twitch still authorizes watch progress/claims server-side.
+        # The Web UI exposes this state as unknown, never as verified eligibility.
+        return self.linked or self.catalog_only
 
     @cached_property
     def has_badge_or_emote(self) -> bool:
@@ -405,7 +413,7 @@ class DropsCampaign:
 
     @property
     def finished(self) -> bool:
-        return all(d.is_claimed or d.required_minutes <= 0 for d in self.drops)
+        return all(d.is_claimed or (d.required_minutes <= 0 and d.required_subs <= 0) for d in self.drops)
 
     @property
     def claimed_drops(self) -> int:

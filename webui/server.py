@@ -144,7 +144,7 @@ def create_app(service, password, *, secure_cookies=False, public_origin=None):
 
     async def asset(request):
         name = request.match_info['name']
-        if name not in ('app.js', 'app.css'):
+        if name not in ('app.js', 'app.css', 'campaigns.js'):
             raise web.HTTPNotFound()
         return web.FileResponse(STATIC / name)
 

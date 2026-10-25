@@ -12,7 +12,10 @@ let csrf = "",
   priority = [],
   settingsLoaded = false,
   busy = false,
-  timer = null;
+  timer = null,
+  campaignPage = 0,
+  campaignMarkup = "",
+  suggestionMarkup = "";
 const esc = (s) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -183,7 +186,7 @@ function render() {
     ? "最近启动 " + clock(m.started_at)
     : "尚未启动";
   $("stat-active").textContent = m.campaigns.filter(
-    (c) => c.active && c.eligible,
+    (c) => c.active && !c.finished,
   ).length;
   $("stat-claimed").textContent = m.campaigns.reduce(
     (sum, c) => sum + c.drops.filter((d) => d.claimed).length,
@@ -205,6 +208,9 @@ function render() {
   const d = m.drop;
   $("current-drop").className = d ? "" : "empty";
   $("current-drop").innerHTML = d
+    && d.progress_known === false
+    ? `<div class="current-game">${esc(m.watching?.game ?? "当前奖励")}</div><h3 class="current-title">${esc(d.rewards || d.name)}</h3><p class="muted">等待 Twitch 确认账号进度 · 需要观看 ${d.required_minutes} 分钟</p>`
+    : d
     ? `<div class="current-game">${esc(m.watching?.game ?? "当前奖励")}</div><h3 class="current-title">${esc(d.rewards || d.name)}</h3><div class="meter"><progress max="100" value="${pct(d.progress)}" aria-label="掉宝进度"></progress></div><div class="reward-line"><span>${d.minutes} / ${d.required_minutes} 分钟${d.minutes !== d.confirmed_minutes ? " · 含估算进度" : ""}</span><strong>${pct(d.progress)}%</strong></div>`
     : "尚无掉宝任务。连接账号后，在“游戏与设置”中添加优先游戏。";
   $("recent-logs").innerHTML = m.logs.length
@@ -231,9 +237,11 @@ function render() {
     button.addEventListener("click", () =>
       action("select-channel", { id: button.dataset.id }),
     );
-  $("game-options").innerHTML = m.games
+  const options = m.games
     .map((g) => `<option value="${esc(g)}"></option>`)
     .join("");
+  if ($("game-options").innerHTML !== options) $("game-options").innerHTML = options;
+  renderGameSuggestions();
   if (!settingsLoaded) loadSettings();
   renderCampaigns();
   renderLogs();
@@ -242,28 +250,45 @@ function renderCampaigns() {
   if (!model) return;
   const q = $("campaign-search").value.toLowerCase(),
     filter = $("campaign-filter").value;
-  const list = model.campaigns.filter(
-    (c) =>
-      (c.name + " " + c.game).toLowerCase().includes(q) &&
-      (filter === "all" || c[filter]),
-  );
-  $("campaign-grid").innerHTML = list.length
-    ? list
+  const discovery = model.discovery;
+  $("catalog-status").textContent = discovery
+    ? `${discovery.message}${discovery.updated_at ? " · 更新于 " + date(discovery.updated_at) : ""}`
+    : "活动数据尚未加载";
+  $("catalog-status").className = "catalog-status" + (discovery?.status === "error" ? " warning" : "");
+  const list = model.campaigns.filter((c) => CampaignView.matches(c, filter, q))
+    .sort((a, b) => Number(b.active) - Number(a.active) || new Date(a.ends_at) - new Date(b.ends_at));
+  const pages = Math.max(1, Math.ceil(list.length / 12));
+  campaignPage = Math.min(campaignPage, pages - 1);
+  $("campaign-count").textContent = `共 ${list.length} 个活动 · ${campaignPage + 1} / ${pages} 页`;
+  $("campaign-prev").disabled = campaignPage === 0;
+  $("campaign-next").disabled = campaignPage === pages - 1;
+  const html = list.length
+    ? list.slice(campaignPage * 12, (campaignPage + 1) * 12)
         .map((c) => {
           const art = image(c.image),
             url = link(c.link_url);
-          return `<article class="campaign"><div class="campaign-head">${art ? `<img src="${esc(art)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><span class="badge">${c.expired ? "已结束" : c.upcoming ? "即将开始" : "进行中"}</span><h3>${esc(c.game)}</h3><small>${esc(c.name)}</small></div></div><div class="campaign-body"><div class="reward-line"><span>${c.linked ? "账号已关联" : "需要关联游戏账号"}</span><span>${esc(date(c.ends_at))} 截止</span></div>${!c.linked && url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">前往关联账号 ↗</a>` : ""}${c.drops
+          const linkage = c.linked === null ? "账号关联状态待 Twitch 确认" : c.linked ? "账号已关联" : "需要关联游戏账号";
+          return `<article class="campaign"><div class="campaign-head">${art ? `<img src="${esc(art)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><span class="badge ${c.finished ? "good" : ""}">${CampaignView.status(c)}</span><h3>${esc(c.game)}</h3><small>${esc(c.name)}</small></div></div><div class="campaign-body"><small>${c.catalog_only ? "公开活动目录 · 账号进度待同步" : "Twitch 账号数据"}</small><div class="reward-line"><span>${linkage}</span><span>${esc(date(c.ends_at))} 截止</span></div>${c.linked !== true && url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">前往关联账号 ↗</a>` : ""}${!c.finished && !c.expired && c.watchable ? `<button type="button" class="choose-game" data-game="${esc(c.game)}">加入优先游戏</button>` : ""}${c.drops
             .map((d) => {
               const reward = image(d.benefits[0]?.image);
-              return `<div class="reward"><div class="reward-top">${reward ? `<img src="${esc(reward)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><strong>${esc(d.rewards || d.name)}</strong><small>${d.claimed ? "已领取" : d.claimable ? "等待核心自动领取" : "累计观看时长"}</small></div></div><div class="meter"><progress max="100" value="${pct(d.progress)}" aria-label="奖励进度"></progress></div><div class="reward-line"><span>${d.minutes} / ${d.required_minutes} 分钟${d.minutes !== d.confirmed_minutes ? " · 含估算" : ""}</span><span>${pct(d.progress)}%</span></div></div>`;
+              if (d.required_subs > 0) return `<div class="reward"><div class="reward-top">${reward ? `<img src="${esc(reward)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><strong>${esc(d.rewards || d.name)}</strong><small>${d.claimed ? "已领取" : `需要订阅 ${d.required_subs} 次 · 无法通过挂机完成`}</small></div></div></div>`;
+              const known = d.progress_known !== false;
+              return `<div class="reward"><div class="reward-top">${reward ? `<img src="${esc(reward)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><strong>${esc(d.rewards || d.name)}</strong><small>${d.claimed ? "已领取" : d.claimable ? "等待核心自动领取" : known ? "累计观看时长" : "尚未取得账号进度"}</small></div></div>${known ? `<div class="meter"><progress max="100" value="${pct(d.progress)}" aria-label="奖励进度"></progress></div><div class="reward-line"><span>${d.minutes} / ${d.required_minutes} 分钟${d.minutes !== d.confirmed_minutes ? " · 含估算" : ""}</span><span>${pct(d.progress)}%</span></div>` : `<p class="muted">需要观看 ${d.required_minutes} 分钟 · 当前进度未知</p>`}</div>`;
             })
             .join("")}</div></article>`;
         })
         .join("")
-    : '<div class="panel empty">暂无匹配活动。首次使用请启动服务并完成 Twitch 授权。</div>';
+    : `<div class="panel empty">${esc(CampaignView.empty(model.account.authenticated, discovery, model.campaigns.length > 0))}</div>`;
+  if (campaignMarkup !== html) { $("campaign-grid").innerHTML = html; campaignMarkup = html; }
 }
-$("campaign-search").addEventListener("input", renderCampaigns);
-$("campaign-filter").addEventListener("change", renderCampaigns);
+$("campaign-grid").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-game]");
+  if (button) { addGame(button.dataset.game); page("settings"); notice("已加入待保存列表；点击保存设置，再重新加载以生效。"); }
+});
+for (const [id, event] of [["campaign-search", "input"], ["campaign-filter", "change"]])
+  $(id).addEventListener(event, () => { campaignPage = 0; renderCampaigns(); });
+$("campaign-prev").addEventListener("click", () => { campaignPage--; renderCampaigns(); });
+$("campaign-next").addEventListener("click", () => { campaignPage++; renderCampaigns(); });
 function loadSettings() {
   const s = model.settings;
   priority = [...s.priority];
@@ -278,6 +303,7 @@ function loadSettings() {
   $("language").value = s.language;
   settingsLoaded = true;
   renderPriority();
+  renderGameSuggestions();
 }
 function renderPriority() {
   $("priority-list").innerHTML = priority.length
@@ -301,14 +327,31 @@ function renderPriority() {
       renderPriority();
     });
 }
-function addGame() {
-  const value = $("game-input").value.trim();
+function addGame(game) {
+  const value = (typeof game === "string" ? game : $("game-input").value).trim();
   if (value && !priority.includes(value)) {
     priority.push(value);
     $("game-input").value = "";
     renderPriority();
+    renderGameSuggestions();
   }
 }
+function renderGameSuggestions() {
+  if (!model) return;
+  const query = $("game-input").value.trim().toLowerCase();
+  const games = model.games.filter((g) => g.toLowerCase().includes(query) && !priority.includes(g));
+  $("game-hint").textContent = games.length
+    ? `找到 ${games.length} 个有未完成活动的游戏，点击下方名称添加。`
+    : query ? "当前活动目录没有匹配游戏。可手动添加完整名称，待活动开放后参与。"
+      : "当前没有可添加的游戏；已完成活动不列入候选。目录加载失败时请刷新活动。";
+  const html = games.slice(0, 8).map((g) => `<button type="button" data-game="${esc(g)}">${esc(g)}</button>`).join("");
+  if (suggestionMarkup !== html) { $("game-suggestions").innerHTML = html; suggestionMarkup = html; }
+}
+$("game-input").addEventListener("input", renderGameSuggestions);
+$("game-suggestions").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-game]");
+  if (button) addGame(button.dataset.game);
+});
 $("add-game").addEventListener("click", addGame);
 $("game-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
