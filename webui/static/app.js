@@ -336,8 +336,10 @@ $("settings-form").addEventListener("submit", async (e) => {
     b.disabled = false;
   }
 });
-function renderLogs() {
+function renderLogs(force = false) {
   if (!model) return;
+  // Do not jump back to the top while someone is reading older log entries.
+  if (!force && $("log-list").scrollTop > 10) return;
   const filtered = model.logs.filter(
     (l) =>
       $("log-filter").value === "all" ||
@@ -354,7 +356,13 @@ function renderLogs() {
         .join("")
     : '<div class="empty">当前没有匹配日志</div>';
 }
-$("log-filter").addEventListener("change", renderLogs);
+$("log-filter").addEventListener("change", () => {
+  $("log-list").scrollTop = 0;
+  renderLogs(true);
+});
+$("log-list").addEventListener("scroll", () => {
+  if ($("log-list").scrollTop === 0) renderLogs();
+});
 api("session")
   .then(entered)
   .catch(() => showLogin());

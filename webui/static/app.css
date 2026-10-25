@@ -721,22 +721,33 @@ a {
     justify-content: center;
   }
   .nav {
-    padding: 9px 12px;
+    padding: 9px 4px;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
     font-size: 12px;
-    gap: 7px;
+    gap: 3px;
   }
   .sidebar-foot {
     display: none;
   }
   header {
     padding: 22px 18px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header > div:first-child {
+    flex: 1 1 100%;
   }
   .header-right {
     gap: 7px;
+    width: 100%;
+    justify-content: space-between;
   }
   .header-right button {
     font-size: 11px;
     padding: 6px 9px;
+    white-space: nowrap;
   }
   h1 {
     font-size: 23px;
@@ -752,6 +763,13 @@ a {
   }
   .hero h2 {
     font-size: 27px;
+  }
+  .hero .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .hero .actions .primary {
+    grid-column: 1 / -1;
   }
   .stats {
     grid-template-columns: 1fr 1fr;
@@ -787,6 +805,7 @@ a {
   }
   .nav span {
     font-size: 11px;
+    white-space: nowrap;
   }
 }
 @media (prefers-reduced-motion: reduce) {

@@ -18,13 +18,16 @@ from contextlib import suppress
 from functools import cached_property
 from datetime import datetime, timezone
 from collections import abc, OrderedDict
-from typing import Any, Literal, Callable, Generic, Mapping, TypeVar, ParamSpec, cast
+from typing import Any, Literal, Callable, Generic, Mapping, TypeVar, ParamSpec, cast, TYPE_CHECKING
 
 from yarl import URL
 
 from exceptions import ExitRequest, ReloadRequest
 from constants import IS_PACKAGED, JsonType, PriorityMode
 from constants import _resource_path as resource_path  # noqa
+
+if TYPE_CHECKING:
+    import tkinter as tk
 
 
 _T = TypeVar("_T")  # type
