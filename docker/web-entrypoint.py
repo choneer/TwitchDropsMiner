@@ -5,7 +5,10 @@ import sys
 
 os.umask(0o077)
 source = Path(os.environ.get('WEB_PASSWORD_FILE', '/run/secrets/web_password'))
-password = source.read_bytes().removesuffix(b'\n')
+try:
+    password = source.read_bytes().removesuffix(b'\n')
+except OSError:
+    raise SystemExit('Missing readable WEB_PASSWORD_FILE; mount a web password secret') from None
 if not 16 <= len(password) <= 72 or any(c < 32 or c > 126 for c in password):
     raise SystemExit('Mount a single-line 16–72 printable ASCII byte web password secret')
 for path in (Path('/data'), Path('/data/cache'), Path('/data/web-logs'), Path('/run/tdm-web')):

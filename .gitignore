@@ -31,3 +31,4 @@ settings.json
 /docker/data/
 /docker/data-web/
 /.venv-web/
+/artifacts/

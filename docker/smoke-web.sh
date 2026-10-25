@@ -57,8 +57,11 @@ request = urllib.request.Request(root + '/api/settings', method='PUT',
 assert op.open(request).status == 200
 # No desktop binaries, Tk, pystray or display variables are needed in this image.
 import importlib.util
-assert importlib.util.find_spec('_tkinter') is None
+import sys
+from twitch import Twitch
+assert 'tkinter' not in sys.modules and 'gui' not in sys.modules
 assert importlib.util.find_spec('pystray') is None
+assert not Path('/usr/bin/Xvfb').exists() and not Path('/usr/bin/x11vnc').exists()
 assert Path('/data/settings.json').exists()
 print('PASS: native HTML, authenticated API, CSRF, settings persistence, no desktop dependencies')
 PY
