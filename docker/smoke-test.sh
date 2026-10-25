@@ -19,6 +19,13 @@ if docker run --rm --network none "$image"; then
     echo 'Missing password was incorrectly accepted' >&2
     exit 1
 fi
+printf '%s\n' 'too-short' > "$test_root/password"
+if docker run --rm --network none \
+    -v "$test_root/password:/run/secrets/web_password:ro" "$image"; then
+    echo 'Weak password was incorrectly accepted' >&2
+    exit 1
+fi
+printf '%s\n' 'offline-smoke-password-not-for-production' > "$test_root/password"
 docker volume create "$volume" >/dev/null
 docker run -d --name "$name" --network none \
     -v "$volume:/data" \
@@ -29,7 +36,8 @@ for attempt in $(seq 1 60); do
         ready=true
         break
     fi
-    if docker exec "$name" supervisorctl -c /opt/container/supervisord.conf status miner 2>/dev/null | grep -q FATAL; then
+    miner_status=$(docker exec "$name" supervisorctl -c /opt/container/supervisord.conf status miner 2>/dev/null || true)
+    if [[ "$miner_status" == *FATAL* ]]; then
         break
     fi
     sleep 2
@@ -57,6 +65,8 @@ assert constants.SETTINGS_PATH == Path('/data/settings.json')
 assert constants.COOKIES_PATH == Path('/data/cookies.jar')
 assert constants.LANG_PATH == Path('/opt/tdm/lang')
 assert constants.LANG_PATH.is_dir()
+windows = subprocess.check_output(['xwininfo', '-root', '-tree'], text=True)
+assert constants.WINDOW_TITLE in windows, 'Miner main window is missing'
 desktop_env = dict(os.environ)
 desktop_env.pop('TDM_DATA_DIR', None)
 subprocess.run([sys.executable, '-c',
@@ -93,10 +103,14 @@ PY
 # Test graceful stop and a new container using the same volume, not just restart.
 docker stop --time 150 "$name" >/dev/null
 test "$(docker inspect --format '{{.State.ExitCode}}' "$name")" = 0
+if docker logs "$name" 2>&1 | grep -q SIGKILL; then
+    echo 'A child process required SIGKILL during shutdown' >&2
+    exit 1
+fi
 docker rm "$name" >/dev/null
 docker run -d --name "$name" --network none \
     -v "$volume:/data" \
     -v "$test_root/password:/run/secrets/web_password:ro" "$image" >/dev/null
 docker exec "$name" /opt/venv/bin/python -c \
-    "from pathlib import Path; assert Path('/data/.smoke-persistence').read_text() == 'retained'"
+    "from pathlib import Path; import json; assert Path('/data/.smoke-persistence').read_text() == 'retained'; json.loads(Path('/data/settings.json').read_text())"
 echo 'PASS: graceful stop and volume persistence after recreation'

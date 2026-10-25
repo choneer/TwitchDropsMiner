@@ -1,5 +1,9 @@
 FROM debian:bookworm-slim
 
+LABEL org.opencontainers.image.source="https://github.com/choneer/TwitchDropsMiner" \
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.title="Twitch Drops Miner - Docker fork"
+
 ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:0 HOME=/data TDM_DATA_DIR=/data \
     PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 XMODIFIERS=@im=none
@@ -17,6 +21,7 @@ RUN /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt \
     && /opt/venv/bin/python -c 'import PIL.ImageTk, tkinter, gi, truststore'
 WORKDIR /opt/tdm
 COPY *.py ./
+COPY LICENSE ./LICENSE
 COPY icons ./icons
 COPY lang ./lang
 COPY docker /opt/container

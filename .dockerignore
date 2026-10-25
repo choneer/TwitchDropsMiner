@@ -1,5 +1,6 @@
 *
 !Dockerfile
+!LICENSE
 !requirements.txt
 !*.py
 !icons/**
