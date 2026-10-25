@@ -783,6 +783,7 @@ class Twitch:
                     self.change_state(State.IDLE)
             elif self._state is State.CHANNELS_FETCH:
                 self.gui.status.update(_("gui", "status", "gathering"))
+                logger.info('开始搜索直播频道：%s', '、'.join(game.name for game in self.wanted_games) or '未选择游戏')
                 # start with all current channels, clear the memory and GUI
                 new_channels: set[Channel] = set(channels.values())
                 channels.clear()
@@ -804,14 +805,19 @@ class Twitch:
                             no_acl.add(campaign.game)
                 # remove all ACL channels that already exist from the other set
                 acl_channels.difference_update(new_channels)
+                logger.info('正在检查 %d 个活动指定频道的在线状态', len(acl_channels))
                 # use the other set to set them online if possible
                 await self.bulk_check_online(acl_channels)
+                logger.info('指定频道检查完成：%d / %d 个在线', sum(c.online for c in acl_channels), len(acl_channels))
                 # finally, add them as new channels
                 new_channels.update(acl_channels)
                 for game in no_acl:
                     # for every campaign without an ACL, for it's game,
                     # add a list of live channels with drops enabled
-                    new_channels.update(await self.get_live_streams(game, drops_enabled=True))
+                    logger.info('正在搜索游戏「%s」的掉宝直播频道', game.name)
+                    found_channels = await self.get_live_streams(game, drops_enabled=True)
+                    logger.info('游戏「%s」找到 %d 个掉宝直播频道', game.name, len(found_channels))
+                    new_channels.update(found_channels)
                 # sort them descending by viewers, by priority and by game priority
                 # NOTE: Viewers sort also ensures ONLINE channels are sorted to the top
                 # NOTE: We can drop using the set now, because there's no more channels being added
@@ -825,6 +831,9 @@ class Twitch:
                 # offline (or online but low viewers) channels end up
                 to_remove_channels = ordered_channels[MAX_CHANNELS:]
                 ordered_channels = ordered_channels[:MAX_CHANNELS]
+                logger.info('频道筛选完成：发现 %d 个，保留 %d 个；在线 %d 个，符合观看条件 %d 个',
+                            len(new_channels), len(ordered_channels), sum(c.online for c in ordered_channels),
+                            sum(self.can_watch(c) for c in ordered_channels))
                 if to_remove_channels:
                     # tracked channels and gui were cleared earlier, so no need to do it here
                     # just make sure to unsubscribe from their topics
@@ -923,6 +932,7 @@ class Twitch:
                     self._state_change.clear()
                 else:
                     # not watching anything and there isn't anything to watch either
+                    logger.info('当前没有符合观看条件的频道，进入等待；频道状态变化或活动刷新后重新评估')
                     self.print(_("status", "no_channel"))
                     self.change_state(State.IDLE)
                 del new_watching, selected_channel, watching_channel
@@ -1081,6 +1091,8 @@ class Twitch:
         )
 
     def watch(self, channel: Channel, *, update_status: bool = True):
+        if update_status:
+            logger.info('选择观看频道：%s；游戏：%s', channel.name, channel.game.name if channel.game else '未知')
         self.gui.tray.change_icon("active")
         self.gui.channels.set_watching(channel)
         self.watching_channel.set(channel)

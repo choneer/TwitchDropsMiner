@@ -842,6 +842,16 @@ main {
   overflow-wrap: anywhere;
   line-height: 1.8;
 }
+.runtime-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 18px; margin-bottom: 24px; }
+.runtime-toolbar #runtime-status { margin: 0; font-size: 13px; }
+.timeline-panel { margin-bottom: 28px; }
+.timeline-actions { display: flex; flex-wrap: wrap; gap: 14px; }
+.timeline-panel .section-title { flex-wrap: wrap; gap: 12px; }
+.timeline-panel .section-title small { display: block; margin-top: 6px; max-width: none; }
+#recent-logs { height: 340px; overflow-y: auto; scrollbar-width: thin; scrollbar-gutter: stable; padding-right: 12px; }
+.timeline-entry span { white-space: pre-wrap; }
+.timeline-entry.timeline-error span { color: var(--red); }
+.timeline-entry.timeline-warning span { color: #995b21; }
 .recent-list p:first-child {
   padding-top: 0;
 }

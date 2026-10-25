@@ -30,10 +30,13 @@ def channel_view(channel):
 
 
 class Status:
-    def __init__(self):
+    def __init__(self, service=None):
+        self.service = service
         self.text = '等待启动'
 
     def update(self, text):
+        if str(text) != self.text and self.service:
+            self.service.log('INFO', '状态：' + str(text))
         self.text = str(text)
 
     def clear(self):
@@ -169,7 +172,7 @@ class WebBridge:
     def __init__(self, twitch, service):
         self._twitch, self.service = twitch, service
         self._closed = asyncio.Event()
-        self.status, self.login = Status(), Login(self)
+        self.status, self.login = Status(service), Login(self)
         self.inv, self.channels = Inventory(), Channels()
         self.progress, self.websockets = Progress(), Websockets()
         self.tray = Tray(service)

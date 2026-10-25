@@ -213,16 +213,7 @@ function render() {
     : d
     ? `<div class="current-game">${esc(m.watching?.game ?? "当前奖励")}</div><h3 class="current-title">${esc(d.rewards || d.name)}</h3><div class="meter"><progress max="100" value="${pct(d.progress)}" aria-label="掉宝进度"></progress></div><div class="reward-line"><span>${d.minutes} / ${d.required_minutes} 分钟${d.minutes !== d.confirmed_minutes ? " · 含估算进度" : ""}</span><strong>${pct(d.progress)}%</strong></div>`
     : "尚无掉宝任务。连接账号后，在“游戏与设置”中添加优先游戏。";
-  $("recent-logs").innerHTML = m.logs.length
-    ? m.logs
-        .slice(-4)
-        .reverse()
-        .map(
-          (l) =>
-            `<p><small>${esc(clock(l.at))} · ${esc(l.level)}</small>${esc(l.message.slice(0, 180))}</p>`,
-        )
-        .join("")
-    : '<p class="muted">暂无事件，启动后可查看运行过程。</p>';
+  renderTimeline(m.logs);
   $("channel-list").className =
     "channel-list" + (m.channels.length ? "" : " empty");
   $("channel-list").innerHTML = m.channels.length
@@ -246,6 +237,29 @@ function render() {
   renderCampaigns();
   renderLogs();
 }
+let followTimeline = true, timelineMarkup = "";
+function renderTimeline(logs) {
+  const box = $("recent-logs"), previous = box.scrollTop;
+  const html = logs.length ? logs.slice(-30).map((entry) =>
+    `<p class="timeline-entry ${["ERROR", "CRITICAL"].includes(entry.level) ? "timeline-error" : entry.level === "WARNING" ? "timeline-warning" : ""}"><small>${esc(new Date(entry.at).toLocaleString("zh-CN", {hour12: false}))} · ${esc(entry.level)}${entry.historical ? " · 历史记录" : ""}</small><span>${esc(entry.message)}</span></p>`
+  ).join("") : '<p class="muted">暂无事件，启动后可查看运行过程。</p>';
+  if (timelineMarkup !== html) {
+    box.innerHTML = html;
+    timelineMarkup = html;
+    box.scrollTop = followTimeline ? box.scrollHeight : previous;
+  }
+  $("follow-logs").textContent = followTimeline ? "正在跟随最新" : "回到最新日志";
+}
+$("recent-logs").addEventListener("scroll", () => {
+  const box = $("recent-logs");
+  followTimeline = box.scrollHeight - box.scrollTop - box.clientHeight < 24;
+  $("follow-logs").textContent = followTimeline ? "正在跟随最新" : "回到最新日志";
+});
+$("follow-logs").addEventListener("click", () => {
+  followTimeline = true;
+  $("recent-logs").scrollTop = $("recent-logs").scrollHeight;
+  $("follow-logs").textContent = "正在跟随最新";
+});
 function renderCampaigns() {
   if (!model) return;
   const q = $("campaign-search").value.toLowerCase(),

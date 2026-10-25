@@ -99,34 +99,26 @@
         <main>
           <div id="notice" role="status" hidden></div>
           <section id="overview" class="page">
-            <div class="hero">
-              <div>
-                <p class="eyebrow">LESS NOISE. MORE PROGRESS.</p>
-                <h2>每一份期待，<br />都有迹可循。</h2>
-                <p class="hero-description">
-                  从连接账号，到奖励入库。<br class="mobile-break" />
-                  在一个清晰的工作空间里，掌握所有进展。
-                </p>
-                <p id="runtime-status">等待后台启动</p>
-                <div class="actions">
-                  <button class="primary" data-action="start">
-                    启动 / 连接 Twitch</button
-                  ><button data-action="reload">重新加载</button
-                  ><button class="ghost stop-button" data-action="stop">
-                    停止服务
-                  </button>
-                </div>
-              </div>
-              <div class="hero-aside">
-                <span class="workspace-symbol" aria-hidden="true"
-                  ><svg viewBox="0 0 24 24">
-                    <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
-                    <path d="m4 7.5 8 4.5 8-4.5M12 12v9" /></svg
-                ></span>
-                <p>专注值得等待的事。</p>
-                <small>你的游戏，你的优先级。</small>
+            <div class="runtime-toolbar">
+              <p id="runtime-status" role="status">等待后台启动</p>
+              <div class="actions">
+                <button class="primary" data-action="start">启动 / 连接 Twitch</button>
+                <button data-action="reload">重新加载</button>
+                <button class="ghost stop-button" data-action="stop">停止服务</button>
               </div>
             </div>
+            <article class="panel timeline-panel">
+              <div class="section-title">
+                <div><h2>运行时间线</h2><small>最近 30 条 · 重启前记录标注为历史</small></div>
+                <div class="timeline-actions">
+                  <button id="follow-logs" type="button" class="text-button">跟随最新日志</button>
+                  <button data-open="logs" class="text-button">全部日志 →</button>
+                </div>
+              </div>
+              <div id="recent-logs" class="recent-list" tabindex="0" role="region" aria-label="运行时间线">
+                <p class="muted">等待服务事件</p>
+              </div>
+            </article>
             <div class="stats">
               <article>
                 <span>后台状态</span><strong id="phase">—</strong
@@ -174,7 +166,7 @@
               <p>服务不会无限重试登录。请查看错误原因后，再点击重新加载。</p>
               <pre id="error-detail"></pre>
             </div>
-            <div class="two-columns overview-columns">
+            <div class="overview-columns">
               <article class="panel">
                 <div class="section-title">
                   <h2>正在进行</h2>
@@ -182,17 +174,6 @@
                 </div>
                 <div id="current-drop" class="empty">
                   尚无掉宝任务。连接账号后，在“游戏与设置”中添加优先游戏。
-                </div>
-              </article>
-              <article class="panel">
-                <div class="section-title">
-                  <h2>最近动态</h2>
-                  <button data-open="logs" class="text-button">
-                    全部日志 →
-                  </button>
-                </div>
-                <div id="recent-logs" class="recent-list">
-                  <p class="muted">等待服务事件</p>
                 </div>
               </article>
             </div>

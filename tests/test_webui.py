@@ -118,6 +118,36 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.service.logs), 500)
         self.assertEqual(self.service.logs[0]['message'], '50')
 
+    async def test_history_survives_restart_and_remains_redacted(self):
+        self.service.log('INFO', 'Search started password=' + PASSWORD)
+        self.service.log('INFO', 'Search started password=' + PASSWORD)
+        self.assertEqual(len(self.service.logs), 1)
+        restored = MinerService(self.directory, FakeWorker, PASSWORD)
+        try:
+            self.assertEqual(len(restored.logs), 1)
+            self.assertTrue(restored.logs[0]['historical'])
+            self.assertNotIn(PASSWORD, restored.logs[0]['message'])
+            restored.log('INFO', 'Found 3 channels')
+            self.assertGreater(restored.logs[-1]['id'], restored.logs[0]['id'])
+        finally:
+            await restored.close()
+
+    async def test_legacy_log_import_and_duplicate_status(self):
+        legacy = self.directory / 'legacy'
+        folder = legacy / 'web-logs'; folder.mkdir(parents=True)
+        (folder / 'application.log').write_text('2026-10-25 10:00:00,000 INFO Legacy search password=' + PASSWORD + '\n')
+        restored = MinerService(legacy, FakeWorker, PASSWORD)
+        try:
+            self.assertTrue(restored.logs[0]['historical'])
+            self.assertNotIn(PASSWORD, restored.logs[0]['message'])
+            from webui.bridge import Status
+            status = Status(restored)
+            status.update('Searching channels'); status.update('Searching channels')
+            self.assertEqual(sum('Searching channels' in e['message'] for e in restored.logs), 1)
+            self.assertTrue((folder / 'events.jsonl').exists())
+        finally:
+            await restored.close()
+
     async def test_settings_validated_before_mutating(self):
         before = self.service.settings.connection_quality
         with self.assertRaises(ValueError):

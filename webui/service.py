@@ -54,6 +54,10 @@ class MinerService:
         self.file_handler = RotatingFileHandler(log_dir / 'application.log', maxBytes=2*1024*1024,
                                                backupCount=3, encoding='utf-8')
         self.file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+        self.history_handler = RotatingFileHandler(log_dir / 'events.jsonl', maxBytes=2*1024*1024,
+                                                   backupCount=3, encoding='utf-8')
+        self.history_handler.setFormatter(logging.Formatter('%(message)s'))
+        self._restore_history(log_dir)
         self.handler = ServiceHandler(self)
         self.handler.setFormatter(logging.Formatter('%(name)s: %(message)s'))
         self.logger = logging.getLogger('TwitchDrops')
@@ -66,6 +70,45 @@ class MinerService:
     def _set_language(self):
         with suppress(ValueError):
             _.set_language(self.settings.language)
+
+    def _restore_history(self, directory):
+        # Bounded tail reads; never import arbitrary raw request dumps.
+        paths = [directory / 'events.jsonl.1', directory / 'events.jsonl']
+        structured = any(p.exists() and p.stat().st_size for p in paths)
+        if not structured:
+            paths = [directory / 'application.log.1', directory / 'application.log']
+        for path in paths:
+            if not path.exists():
+                continue
+            with path.open('rb') as stream:
+                size = path.stat().st_size
+                stream.seek(max(0, size - 512*1024))
+                if size > 512*1024:
+                    stream.readline()
+                lines = stream.read().decode('utf-8', errors='replace').splitlines()
+            for line in lines:
+                try:
+                    if structured:
+                        entry = json.loads(line)
+                        at, level, message = entry['at'], entry['level'], entry['message']
+                        datetime.fromisoformat(at)
+                    else:
+                        match = re.match(r'^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3}) (INFO|WARNING|ERROR|CRITICAL|DEBUG) (.*)$', line)
+                        if not match:
+                            continue
+                        stamp, level, message = match.groups()
+                        at = datetime.strptime(stamp, '%Y-%m-%d %H:%M:%S,%f').astimezone(timezone.utc).isoformat()
+                    if level not in ('INFO', 'WARNING', 'ERROR', 'CRITICAL', 'DEBUG') or not isinstance(message, str):
+                        continue
+                    self.sequence += 1
+                    self.logs.append({'id': self.sequence, 'at': at, 'level': level,
+                                      'message': self.redact(message), 'historical': True})
+                except (ValueError, KeyError, TypeError):
+                    continue
+        if not structured:
+            for entry in self.logs:
+                self.history_handler.emit(logging.LogRecord('history', logging.INFO, '', 0,
+                    json.dumps(entry, ensure_ascii=False), (), None))
 
     def redact(self, text):
         text = str(text)
@@ -85,9 +128,14 @@ class MinerService:
 
     def log(self, level, message):
         message = self.redact(message)
+        if self.logs and self.logs[-1]['level'] == level and self.logs[-1]['message'] == message:
+            return
         self.sequence += 1
-        self.logs.append({'id': self.sequence, 'at': datetime.now(timezone.utc).isoformat(),
-                          'level': level, 'message': message})
+        entry = {'id': self.sequence, 'at': datetime.now(timezone.utc).isoformat(),
+                 'level': level, 'message': message}
+        self.logs.append(entry)
+        self.history_handler.emit(logging.LogRecord('history', logging.INFO, '', 0,
+                                                   json.dumps(entry, ensure_ascii=False), (), None))
         record = logging.LogRecord('miner', getattr(logging, level, logging.INFO), '', 0, message, (), None)
         self.file_handler.emit(record)
         # Emit the same redacted message to Docker stdout, not just to the browser.
@@ -175,6 +223,7 @@ class MinerService:
         await self.stop(preserve_intent=True)
         self.logger.removeHandler(self.handler)
         self.file_handler.close()
+        self.history_handler.close()
 
     def settings_view(self):
         return {'priority': self.settings.priority, 'exclude': sorted(self.settings.exclude),
