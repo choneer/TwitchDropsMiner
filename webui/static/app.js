@@ -7,6 +7,9 @@ const phases = {
   stopping: "停止中",
   error: "需要处理",
 };
+let activePage = "overview";
+const pagePositions = new Map();
+const rewardPositions = new Map();
 let csrf = "",
   model = null,
   priority = [],
@@ -114,6 +117,20 @@ $("logout").addEventListener("click", async () => {
   }
 });
 function page(name) {
+  if (name === activePage) return;
+  const position = { y: window.scrollY };
+  if (activePage === "campaigns") {
+    const anchor = Array.from(document.querySelectorAll("[data-campaign-id]"))
+      .find((card) => card.getBoundingClientRect().bottom > 0);
+    if (anchor) {
+      position.id = anchor.dataset.campaignId;
+      position.top = anchor.getBoundingClientRect().top;
+    }
+    for (const element of document.querySelectorAll("[data-reward-scroll]"))
+      rewardPositions.set(element.dataset.rewardScroll, element.scrollTop);
+  }
+  pagePositions.set(activePage, position);
+  activePage = name;
   for (const element of document.querySelectorAll(".page"))
     element.hidden = element.id !== name;
   for (const button of document.querySelectorAll(".nav")) {
@@ -128,6 +145,18 @@ function page(name) {
     settings: "游戏与设置",
     logs: "运行日志",
   }[name];
+  if (name === "campaigns") {
+    renderCampaigns();
+    for (const element of document.querySelectorAll("[data-reward-scroll]"))
+      element.scrollTop = rewardPositions.get(element.dataset.rewardScroll) ?? 0;
+  }
+  requestAnimationFrame(() => {
+    if (activePage !== name) return;
+    const saved = pagePositions.get(name);
+    const anchor = saved?.id && Array.from(document.querySelectorAll("[data-campaign-id]"))
+      .find((card) => card.dataset.campaignId === saved.id);
+    window.scrollTo({top: anchor ? window.scrollY + anchor.getBoundingClientRect().top - saved.top : saved?.y ?? 0, behavior: "instant"});
+  });
 }
 for (const button of document.querySelectorAll("[data-page]"))
   button.addEventListener("click", () => page(button.dataset.page));
@@ -261,7 +290,7 @@ $("follow-logs").addEventListener("click", () => {
   $("follow-logs").textContent = "正在跟随最新";
 });
 function renderCampaigns() {
-  if (!model) return;
+  if (!model || $("campaigns").hidden) return;
   const q = $("campaign-search").value.toLowerCase(),
     filter = $("campaign-filter").value;
   const discovery = model.discovery;
@@ -283,7 +312,7 @@ function renderCampaigns() {
           const art = image(c.image),
             url = link(c.link_url);
           const linkage = c.linked === null ? "账号关联状态待 Twitch 确认" : c.linked ? "账号已关联" : "需要关联游戏账号";
-          return `<article class="campaign"><div class="campaign-head">${art ? `<img src="${esc(art)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><span class="badge ${c.finished ? "good" : ""}">${CampaignView.status(c)}</span><h3>${esc(c.game)}</h3><small>${esc(c.name)}</small></div></div><div class="campaign-body"><small>${c.catalog_only ? "公开活动目录 · 账号进度待同步" : "Twitch 账号数据"}</small><div class="reward-line"><span>${linkage}</span><span>${esc(date(c.ends_at))} 截止</span></div>${c.linked !== true && url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">前往关联账号 ↗</a>` : ""}${!c.finished && !c.expired && c.watchable ? `<button type="button" class="choose-game" data-game="${esc(c.game)}">加入优先游戏</button>` : ""}<div class="reward-scroll" data-reward-scroll="${esc(c.id)}" tabindex="0" role="region" aria-label="${esc(c.game)}的奖励列表">${c.drops
+          return `<article class="campaign" data-campaign-id="${esc(c.id)}"><div class="campaign-head">${art ? `<img src="${esc(art)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><span class="badge ${c.finished ? "good" : ""}">${CampaignView.status(c)}</span><h3>${esc(c.game)}</h3><small>${esc(c.name)}</small></div></div><div class="campaign-body"><small>${c.catalog_only ? "公开活动目录 · 账号进度待同步" : "Twitch 账号数据"}</small><div class="reward-line"><span>${linkage}</span><span>${esc(date(c.ends_at))} 截止</span></div>${c.linked !== true && url ? `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">前往关联账号 ↗</a>` : ""}${!c.finished && !c.expired && c.watchable ? `<button type="button" class="choose-game" data-game="${esc(c.game)}">加入优先游戏</button>` : ""}<div class="reward-scroll" data-reward-scroll="${esc(c.id)}" tabindex="0" role="region" aria-label="${esc(c.game)}的奖励列表">${c.drops
             .map((d) => {
               const reward = image(d.benefits[0]?.image);
               if (d.required_subs > 0) return `<div class="reward"><div class="reward-top">${reward ? `<img src="${esc(reward)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div><strong>${esc(d.rewards || d.name)}</strong><small>${d.claimed ? "已领取" : `需要订阅 ${d.required_subs} 次 · 无法通过挂机完成`}</small></div></div></div>`;
@@ -295,12 +324,12 @@ function renderCampaigns() {
         .join("")
     : `<div class="panel empty">${esc(CampaignView.empty(model.account.authenticated, discovery, model.campaigns.length > 0))}</div>`;
   if (campaignMarkup !== html) {
-    const positions = new Map(Array.from(document.querySelectorAll("[data-reward-scroll]"),
-      (element) => [element.dataset.rewardScroll, element.scrollTop]));
+    for (const element of document.querySelectorAll("[data-reward-scroll]"))
+      rewardPositions.set(element.dataset.rewardScroll, element.scrollTop);
     $("campaign-grid").innerHTML = html;
     campaignMarkup = html;
     for (const element of document.querySelectorAll("[data-reward-scroll]"))
-      element.scrollTop = positions.get(element.dataset.rewardScroll) ?? 0;
+      element.scrollTop = rewardPositions.get(element.dataset.rewardScroll) ?? 0;
   }
 }
 $("campaign-grid").addEventListener("click", (event) => {
