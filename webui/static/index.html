@@ -10,10 +10,17 @@
   <body>
     <section id="login" class="login-shell">
       <form id="login-form" class="login-card">
-        <div class="brand-mark">DH</div>
-        <p class="eyebrow">YOUR DROPS, IN ONE PLACE</p>
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
+            <path d="m4 7.5 8 4.5 8-4.5M12 12v9" />
+          </svg>
+        </div>
+        <p class="eyebrow">YOUR PERSONAL WORKSPACE</p>
         <h1>Drop Harbor</h1>
-        <p class="muted">让奖励靠岸。登录你的私人掉宝控制台。</p>
+        <p class="muted">
+          你的奖励，你的节奏。<br />登录私人控制台，查看每一步进展。
+        </p>
         <label for="password">控制台访问密码</label
         ><input
           id="password"
@@ -33,28 +40,54 @@
     <div id="console" class="app-shell" hidden>
       <aside>
         <a class="brand" href="/"
-          ><span class="brand-mark small">DH</span
-          ><span>Drop Harbor<small>TWITCH DROPS CONSOLE</small></span></a
+          ><span class="brand-mark small" aria-hidden="true"
+            ><svg viewBox="0 0 24 24">
+              <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
+              <path d="m4 7.5 8 4.5 8-4.5M12 12v9" /></svg></span
+          ><span>Drop Harbor<small>私人掉宝控制台</small></span></a
         >
+        <p class="nav-caption">工作空间</p>
         <nav aria-label="主导航">
-          <button class="nav active" data-page="overview">
-            ◈ <span>运行总览</span></button
+          <button class="nav active" data-page="overview" aria-current="page">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="4" y="4" width="6" height="6" rx="1.5" />
+              <rect x="14" y="4" width="6" height="6" rx="1.5" />
+              <rect x="4" y="14" width="6" height="6" rx="1.5" />
+              <rect x="14" y="14" width="6" height="6" rx="1.5" /></svg
+            ><span>运行总览</span></button
           ><button class="nav" data-page="campaigns">
-            ▦ <span>掉宝活动</span></button
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 10h16v11H4zM3 6h18v4H3zM12 6v15" />
+              <path
+                d="M12 6H8.5A2.5 2.5 0 1 1 11 3.5L12 6Zm0 0h3.5A2.5 2.5 0 1 0 13 3.5L12 6Z"
+              /></svg
+            ><span>掉宝活动</span></button
           ><button class="nav" data-page="settings">
-            ☷ <span>游戏与设置</span></button
-          ><button class="nav" data-page="logs">≡ <span>运行日志</span></button>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 7h16M4 17h16" />
+              <circle cx="9" cy="7" r="3" />
+              <circle cx="15" cy="17" r="3" /></svg
+            ><span>游戏与设置</span></button
+          ><button class="nav" data-page="logs">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M5 5h14v14H5zM8 9l3 3-3 3M13 15h3" /></svg
+            ><span>运行日志</span>
+          </button>
         </nav>
         <div class="sidebar-foot">
-          <span class="dot"></span> 原生 Web · 无远程桌面<br /><small
-            >独立社区 fork / 单账号</small
-          >
+          <div class="sidebar-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="5" y="10" width="14" height="11" rx="2" />
+              <path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg
+            ><span>为你的私人空间而建<small>本地部署 · 单账号</small></span>
+          </div>
+          <small>社区独立维护 / Native Web</small>
         </div>
       </aside>
       <div class="workspace">
         <header>
           <div>
-            <p class="eyebrow">YOUR PERSONAL DROP STATION</p>
+            <p class="eyebrow breadcrumb">工作空间 <span>/</span> 控制台</p>
             <h1 id="page-title">运行总览</h1>
           </div>
           <div class="header-right">
@@ -67,19 +100,30 @@
           <section id="overview" class="page">
             <div class="hero">
               <div>
-                <p class="eyebrow">AUTOMATION, WITH VISIBILITY</p>
-                <h2>保持连接，<br />不错过下一份奖励。</h2>
+                <p class="eyebrow">LESS NOISE. MORE PROGRESS.</p>
+                <h2>每一份期待，<br />都有迹可循。</h2>
+                <p class="hero-description">
+                  从连接账号，到奖励入库。<br class="mobile-break" />
+                  在一个清晰的工作空间里，掌握所有进展。
+                </p>
                 <p id="runtime-status">等待后台启动</p>
                 <div class="actions">
                   <button class="primary" data-action="start">
                     启动 / 连接 Twitch</button
                   ><button data-action="reload">重新加载</button
-                  ><button class="ghost" data-action="stop">停止服务</button>
+                  ><button class="ghost stop-button" data-action="stop">
+                    停止服务
+                  </button>
                 </div>
               </div>
-              <div class="orbit" aria-hidden="true">
-                <span>✦</span>
-                <div>DROP<br /><strong>HARBOR</strong></div>
+              <div class="hero-aside">
+                <span class="workspace-symbol" aria-hidden="true"
+                  ><svg viewBox="0 0 24 24">
+                    <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
+                    <path d="m4 7.5 8 4.5 8-4.5M12 12v9" /></svg
+                ></span>
+                <p>专注值得等待的事。</p>
+                <small>你的游戏，你的优先级。</small>
               </div>
             </div>
             <div class="stats">
@@ -129,7 +173,7 @@
               <p>服务不会无限重试登录。请查看错误原因后，再点击重新加载。</p>
               <pre id="error-detail"></pre>
             </div>
-            <div class="two-columns">
+            <div class="two-columns overview-columns">
               <article class="panel">
                 <div class="section-title">
                   <h2>正在进行</h2>
@@ -203,6 +247,7 @@
                   <div class="inline-form">
                     <input
                       id="game-input"
+                      aria-label="添加优先游戏"
                       list="game-options"
                       placeholder="输入或选择游戏名称"
                     /><datalist id="game-options"></datalist
@@ -217,6 +262,7 @@
                   </p>
                   <textarea
                     id="excluded"
+                    aria-label="排除游戏"
                     rows="7"
                     placeholder="每行一个游戏名称"
                   ></textarea

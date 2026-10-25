@@ -113,8 +113,12 @@ $("logout").addEventListener("click", async () => {
 function page(name) {
   for (const element of document.querySelectorAll(".page"))
     element.hidden = element.id !== name;
-  for (const button of document.querySelectorAll(".nav"))
-    button.classList.toggle("active", button.dataset.page === name);
+  for (const button of document.querySelectorAll(".nav")) {
+    const active = button.dataset.page === name;
+    button.classList.toggle("active", active);
+    if (active) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  }
   $("page-title").textContent = {
     overview: "运行总览",
     campaigns: "掉宝活动",
@@ -173,6 +177,7 @@ async function refresh() {
 function render() {
   const m = model;
   $("phase").textContent = phases[m.phase] ?? m.phase;
+  $("phase").dataset.phase = m.phase;
   $("runtime-status").textContent = m.status;
   $("uptime").textContent = m.started_at
     ? "最近启动 " + clock(m.started_at)
