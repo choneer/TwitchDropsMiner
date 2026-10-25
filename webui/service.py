@@ -12,7 +12,7 @@ from pathlib import Path
 import re
 from types import SimpleNamespace
 
-from constants import DATA_DIR, PriorityMode
+from constants import DATA_DIR, PriorityMode, ClientType
 from settings import Settings
 from translate import _
 from utils import json_save
@@ -103,7 +103,8 @@ class MinerService:
                 return
             if self.worker_factory is None:
                 from twitch import Twitch
-                factory = Twitch
+                # This is an explicit web-service default, not a retry/fallback loop.
+                factory = lambda settings, **kwargs: Twitch(settings, client_type=ClientType.SMARTBOX, **kwargs)
             else:
                 factory = self.worker_factory
             self.error = None
@@ -113,6 +114,8 @@ class MinerService:
             self.started_at = datetime.now(timezone.utc).isoformat()
             self.task = asyncio.create_task(self._run(self.client), name='miner-service')
             self.log('INFO', '后台服务已启动')
+            if self.worker_factory is None:
+                self.log('INFO', '设备授权客户端：SMARTBOX')
 
     async def _run(self, client):
         self.phase = 'running'

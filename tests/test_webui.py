@@ -91,6 +91,15 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNot(old, self.service.client)
         self.assertTrue(old.shutdown_called)
 
+    async def test_web_default_explicitly_injects_smartbox(self):
+        from constants import ClientType
+        worker = FakeWorker(self.service.settings, gui_factory=lambda c: WebBridge(c, self.service))
+        self.service.worker_factory = None
+        with patch('twitch.Twitch', return_value=worker) as factory:
+            await self.service.start()
+            self.assertIs(factory.call_args.kwargs['client_type'], ClientType.SMARTBOX)
+        await self.service.stop()
+
     async def test_error_observable_and_redacted_without_restart_loop(self):
         self.service.worker_factory = FailingWorker
         await self.service.start()
@@ -230,6 +239,80 @@ class ApiTests(ServiceTests):
 
 
 class OAuthTests(unittest.IsolatedAsyncioTestCase):
+    def make_auth(self, replies):
+        from twitch import _AuthState
+        from constants import ClientType
+        responses = iter(replies)
+        @asynccontextmanager
+        async def request(method, url, **kwargs):
+            status, payload = next(responses)
+            async def as_json():
+                if isinstance(payload, Exception):
+                    raise payload
+                return payload
+            yield SimpleNamespace(status=status, json=as_json)
+        async def passthrough(coro):
+            return await coro
+        client = SimpleNamespace(gui=SimpleNamespace(login=SimpleNamespace(ask_enter_code=AsyncMock()),
+            coro_unless_closed=passthrough), _client_type=ClientType.SMARTBOX, request=request)
+        auth = _AuthState(client)
+        auth.device_id = 'fixture-device'
+        return auth
+
+    def valid_device(self):
+        return {'device_code': 'fixture-device-code', 'user_code': 'FIXTURE', 'interval': 1,
+                'expires_in': 1800, 'verification_uri': 'https://www.twitch.tv/activate'}
+
+    async def test_invalid_client_reports_status_without_raw_body(self):
+        from exceptions import LoginException
+        auth = self.make_auth([(400, {'message': 'invalid client', 'device_code': 'never-log-this'})])
+        with self.assertRaises(LoginException) as caught:
+            await auth._oauth_login()
+        self.assertIn('HTTP 400, invalid client', str(caught.exception))
+        self.assertNotIn('never-log-this', str(caught.exception))
+
+    async def test_missing_or_invalid_device_fields_are_not_keyerrors(self):
+        from exceptions import LoginException
+        for payload in ({}, [], {'device_code': None},
+                        {**self.valid_device(), 'interval': True},
+                        {**self.valid_device(), 'expires_in': -1},
+                        {**self.valid_device(), 'verification_uri': 'https://evil.example/activate'}):
+            with self.subTest(payload_type=type(payload).__name__):
+                with self.assertRaises(LoginException):
+                    await self.make_auth([(200, payload)])._oauth_login()
+
+    async def test_non_json_response_is_sanitized(self):
+        from exceptions import LoginException
+        auth = self.make_auth([(400, ValueError('secret body should not be logged'))])
+        with self.assertRaises(LoginException) as caught:
+            await auth._oauth_login()
+        self.assertIn('response is not JSON', str(caught.exception))
+        self.assertNotIn('secret body', str(caught.exception))
+
+    async def test_unknown_remote_error_not_echoed(self):
+        from exceptions import LoginException
+        auth = self.make_auth([(403, {'message': 'secret remote value'})])
+        with self.assertRaises(LoginException) as caught:
+            await auth._oauth_login()
+        self.assertIn('unrecognized OAuth error', str(caught.exception))
+        self.assertNotIn('secret remote value', str(caught.exception))
+
+    async def test_missing_token_is_explicit_error(self):
+        from exceptions import LoginException
+        auth = self.make_auth([(200, self.valid_device()), (200, {})])
+        with patch('twitch.asyncio.sleep', new=AsyncMock()):
+            with self.assertRaises(LoginException) as caught:
+                await auth._oauth_login()
+        self.assertIn('missing or invalid access_token', str(caught.exception))
+
+    async def test_pending_and_slow_down_then_success(self):
+        auth = self.make_auth([(200, self.valid_device()),
+            (400, {'message': 'authorization_pending'}), (400, {'error': 'slow_down'}),
+            (200, {'access_token': 'fixture-success-token'})])
+        with patch('twitch.asyncio.sleep', new=AsyncMock()) as sleeper:
+            self.assertEqual(await auth._oauth_login(), 'fixture-success-token')
+        self.assertEqual([call.args[0] for call in sleeper.call_args_list], [1, 1, 6])
+
     async def test_expired_code_restarts_with_correct_device_payload(self):
         from twitch import _AuthState
         from constants import ClientType

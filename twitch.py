@@ -76,6 +76,26 @@ class SkipExtraJsonDecoder(json.JSONDecoder):
 SAFE_LOADS = lambda s: json.loads(s, cls=SkipExtraJsonDecoder)
 
 
+async def _oauth_json(response, stage: str) -> JsonType:
+    """Reject unexpected OAuth responses without logging credentials or raw bodies."""
+    try:
+        body = await response.json()
+    except (ValueError, UnicodeError, aiohttp.ContentTypeError):
+        raise LoginException(f"Twitch {stage}: HTTP {response.status}, response is not JSON") from None
+    if not isinstance(body, dict):
+        raise LoginException(f"Twitch {stage}: HTTP {response.status}, response is not an object")
+    return body
+
+
+def _oauth_error(body: JsonType) -> str:
+    # Never echo arbitrary remote strings: error bodies may contain sensitive data.
+    raw = body.get('error') or body.get('message')
+    known = {'invalid client', 'invalid_client', 'authorization_pending', 'slow_down',
+             'expired_token', 'access_denied', 'invalid_grant', 'invalid_request',
+             'invalid_scope', 'unsupported_grant_type'}
+    return raw if isinstance(raw, str) and raw in known else 'unrecognized OAuth error'
+
+
 class _AuthState:
     def __init__(self, twitch: Twitch):
         self._twitch: Twitch = twitch
@@ -150,11 +170,23 @@ class _AuthState:
                     #     "user_code": "8 chars [A-Z]",
                     #     "verification_uri": "https://www.twitch.tv/activate?device-code=ABCDEFGH"
                     # }
-                    response_json: JsonType = await response.json()
+                    response_json = await _oauth_json(response, 'device authorization')
+                    if response.status != 200:
+                        raise LoginException(
+                            f"Twitch device authorization: HTTP {response.status}, {_oauth_error(response_json)}"
+                        )
+                    for field in ('device_code', 'user_code', 'verification_uri'):
+                        if not isinstance(response_json.get(field), str) or not 1 <= len(response_json[field]) <= 4096:
+                            raise LoginException(f"Twitch device authorization: HTTP 200, missing or invalid {field}")
+                    for field, limit in (('interval', 300), ('expires_in', 86400)):
+                        if type(response_json.get(field)) is not int or not 1 <= response_json[field] <= limit:
+                            raise LoginException(f"Twitch device authorization: HTTP 200, missing or invalid {field}")
                     device_code: str = response_json["device_code"]
                     user_code: str = response_json["user_code"]
                     interval: int = response_json["interval"]
                     verification_uri: URL = URL(response_json["verification_uri"])
+                    if verification_uri.scheme != 'https' or verification_uri.host not in ('www.twitch.tv', 'twitch.tv', 'id.twitch.tv'):
+                        raise LoginException('Twitch device authorization: untrusted verification URL')
                     expires_at = now + timedelta(seconds=response_json["expires_in"])
 
                 # Print the code to the user, open them the activate page so they can type it in
@@ -177,17 +209,19 @@ class _AuthState:
                     ) as response:
                         # Pending is expected; denied/expired/rate-limited are not the same.
                         if response.status != 200:
-                            failure = await response.json()
-                            error = failure.get("error", failure.get("message", ""))
+                            failure = await _oauth_json(response, 'token polling')
+                            error = _oauth_error(failure)
                             if error == "authorization_pending":
                                 continue
                             if error == "slow_down" or response.status == 429:
-                                interval += 5
+                                interval = min(interval + 5, 300)
                                 continue
                             if error == "expired_token":
                                 raise RequestInvalid()
-                            raise LoginException(f"Device authorization failed: HTTP {response.status}")
-                        response_json = await response.json()
+                            raise LoginException(f"Twitch token polling: HTTP {response.status}, {error}")
+                        response_json = await _oauth_json(response, 'token polling')
+                        if not isinstance(response_json.get('access_token'), str) or not 1 <= len(response_json['access_token']) <= 4096:
+                            raise LoginException('Twitch token polling: HTTP 200, missing or invalid access_token')
                         # {
                         #     "access_token": "40 chars [A-Za-z0-9]",
                         #     "refresh_token": "40 chars [A-Za-z0-9]",
@@ -439,7 +473,7 @@ class _AuthState:
 
 
 class Twitch:
-    def __init__(self, settings: Settings, *, gui_factory=None):
+    def __init__(self, settings: Settings, *, gui_factory=None, client_type=None):
         self.settings: Settings = settings
         # State management
         self._state: State = State.IDLE
@@ -453,7 +487,7 @@ class Twitch:
         # Do not modify the default, safe values.
         self._qgl_limiter = RateLimiter(capacity=5, window=1)
         # Client type, session and auth
-        self._client_type: ClientInfo = ClientType.ANDROID_APP
+        self._client_type: ClientInfo = client_type if client_type is not None else ClientType.ANDROID_APP
         self._session: aiohttp.ClientSession | None = None
         self._auth_state: _AuthState = _AuthState(self)
         # GUI
