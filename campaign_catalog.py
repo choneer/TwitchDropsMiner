@@ -114,6 +114,7 @@ def parse_catalog(payload, now=None):
                 c['self'] = {'isAccountConnected': None}
                 c['accountLinkURL'] = c.get('accountLinkURL') or ''
                 c['_catalog_only'] = True
+                c.pop('_account_link_evidence', None)
                 campaigns[c['id']] = c
             except (KeyError, TypeError, ValueError, AssertionError, RecursionError):
                 continue

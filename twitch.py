@@ -1560,6 +1560,9 @@ class Twitch:
                 json.dump(inventory["gameEventDrops"], file, indent=4, sort_keys=True, default=str)
 
         # use the merged data to create campaign objects
+        from account_links import attach_link_evidence
+        matched_links = attach_link_evidence(inventory_data, inventory.get('gameEventDrops'))
+        logger.info('账号关联入口检查完成：%d 个活动匹配 Twitch 奖励记录；活动资格仍以账号接口为准', matched_links)
         campaigns: list[DropsCampaign] = [
             DropsCampaign(self, campaign_data, claimed_benefits)
             for campaign_data in inventory_data.values()

@@ -245,6 +245,7 @@ class WebBridge:
         for c in self.inv.campaigns.values():
             campaigns.append({'id': c.id, 'name': c.name, 'game': c.game.name,
                 'image': str(c.image_url), 'linked': c.linked,
+                'account_link_evidence': c.account_link_evidence,
                 'eligible': bool(c.eligible and not c.catalog_only),
                 'catalog_only': c.catalog_only, 'finished': c.finished,
                 'watchable': any(d.required_minutes > 0 and d.required_subs == 0

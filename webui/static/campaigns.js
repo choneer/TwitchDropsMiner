@@ -1,6 +1,13 @@
 /* Shared presentation rules, also exercised by the offline Node tests. */
 "use strict";
 const CampaignView = {
+  linkage(c) {
+    if (c.linked === true) return "账号已关联（当前活动）";
+    if (c.linked === false) return "需要关联游戏账号（当前活动）";
+    if (c.account_link_evidence === true) return "关联入口已连接（Twitch 奖励记录）";
+    if (c.account_link_evidence === false) return "关联入口未连接（Twitch 奖励记录）";
+    return "账号关联状态未知";
+  },
   status(c) {
     if (c.finished) return "已全部领取";
     if (c.expired) return "已结束";

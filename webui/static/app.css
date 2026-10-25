@@ -657,6 +657,7 @@ main {
 .game-suggestions button { font-size: 12px; padding: 7px 10px; text-align: left; }
 .campaign-head > div { min-width: 0; overflow-wrap: anywhere; }
 .campaign-body .reward-line { flex-wrap: wrap; }
+.link-evidence-note { font-size: 10px; line-height: 1.7; color: var(--muted); margin: 10px 0 0; }
 .campaign {
   overflow: hidden;
   border: 1px solid var(--line);

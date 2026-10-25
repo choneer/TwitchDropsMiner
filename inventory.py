@@ -347,6 +347,7 @@ class DropsCampaign:
         self.game: Game = Game(data["game"])
         self.linked: bool | None = data["self"]["isAccountConnected"]
         self.catalog_only = data.get('_catalog_only', False)
+        self.account_link_evidence = data.get('_account_link_evidence')
         self.link_url: str = data["accountLinkURL"]
         # campaign's image actually comes from the game object
         # we use regex to get rid of the dimensions part (ex. ".../game_id-285x380.jpg")

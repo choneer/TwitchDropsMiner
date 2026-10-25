@@ -1,6 +1,13 @@
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const view = require('../webui/static/campaigns.js');
+test('activity linkage and reward connection evidence remain distinct', () => {
+  assert.match(view.linkage({linked:true,account_link_evidence:false}), /已关联（当前活动）/);
+  assert.match(view.linkage({linked:false,account_link_evidence:true}), /需要关联.*当前活动/);
+  assert.match(view.linkage({linked:null,account_link_evidence:true}), /入口已连接.*奖励记录/);
+  assert.match(view.linkage({linked:null,account_link_evidence:false}), /入口未连接.*奖励记录/);
+  assert.match(view.linkage({linked:null}), /未知/);
+});
 test('finished inventory never masquerades as unfinished open activity', () => {
   const c = {name:'Anniversary', game:'Warhammer', active:true, finished:true, in_inventory:true, eligible:true, earnable:false};
   assert.equal(view.status(c), '已全部领取');
