@@ -1,0 +1,43 @@
+name: Docker fork
+on:
+  push:
+    branches: [docker-support]
+  pull_request:
+    branches: [docker-support]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  image:
+    if: github.repository == 'choneer/TwitchDropsMiner'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: tdm:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Offline container smoke test
+        run: bash docker/smoke-test.sh tdm:test
+      - uses: docker/build-push-action@v6
+        if: github.event_name != 'pull_request'
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/choneer/twitchdropsminer:docker
+            ghcr.io/choneer/twitchdropsminer:sha-${{ github.sha }}
+          cache-from: type=gha

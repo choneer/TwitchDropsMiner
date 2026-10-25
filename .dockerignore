@@ -1,0 +1,10 @@
+*
+!Dockerfile
+!requirements.txt
+!*.py
+!icons/**
+!lang/**
+!docker/**
+docker/*.secret
+docker/.env
+**/__pycache__

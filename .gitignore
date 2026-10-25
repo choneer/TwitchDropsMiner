@@ -26,3 +26,6 @@ settings.json
 /*.AppImage.zsync
 .DS_Store
 *.app
+/docker/.env
+/docker/*.secret
+/docker/data/

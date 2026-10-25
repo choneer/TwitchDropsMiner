@@ -1,5 +1,9 @@
 # Twitch Drops Miner
 
+> This fork adds experimental Docker/noVNC support, maintained independently of
+> DevilXD. See [Docker deployment (中文)](docker/README.zh-CN.md). Upstream's
+> project goals below are preserved; please report container issues to this fork.
+
 This application allows you to AFK mine timed Twitch drops, without having to worry about switching channels when the one you were watching goes offline, claiming the drops, or even receiving the stream data itself. This helps you save on bandwidth and hassle.
 
 ### How It Works:
