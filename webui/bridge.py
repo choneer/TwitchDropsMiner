@@ -26,7 +26,8 @@ def channel_view(channel):
     return {'id': str(channel.id), 'name': channel.name, 'url': str(channel.url),
             'online': channel.online, 'viewers': channel.viewers,
             'game': channel.game.name if channel.game else None,
-            'drops_enabled': channel.drops_enabled, 'priority': channel.acl_based}
+            'drops_enabled': channel.drops_enabled, 'priority': channel.acl_based,
+            'monitor_games': getattr(channel, 'monitor_games', [])}
 
 
 class Status:
@@ -260,6 +261,7 @@ class WebBridge:
                 'user_id': self.login.user_id, 'device': self.login.device},
                 'games': self.games, 'campaigns': campaigns,
                 'discovery': getattr(self._twitch, 'discovery', None),
+                'monitoring': getattr(self._twitch, 'monitoring', None),
                 'channels': [channel_view(c) for c in self.channels.entries.values()],
                 'watching': channel_view(self.channels.watching) if self.channels.watching else None,
                 'drop': drop_view(self.progress.drop) if self.progress.drop else None,

@@ -249,7 +249,7 @@ function render() {
     ? m.channels
         .map(
           (c) =>
-            `<div class="channel-row"><div><strong>${esc(c.name)}</strong><small>${esc(c.game ?? "未开播")} · ${c.online ? "在线" : "离线"} · ${c.viewers ?? 0} 人</small></div><button class="switch-channel" data-id="${esc(c.id)}" ${!c.online || !c.drops_enabled ? "disabled" : ""}>切换频道</button></div>`,
+            `<div class="channel-row"><div><strong>${esc(c.name)}</strong><small>${esc(c.game ?? (c.monitor_games?.join(" / ") || "未开播"))} · ${c.online ? "在线" : "离线"} · ${c.viewers ?? 0} 人</small></div><button class="switch-channel" data-id="${esc(c.id)}" ${!c.online || !c.drops_enabled ? "disabled" : ""}>切换频道</button></div>`,
         )
         .join("")
     : "暂无频道。登录并选择游戏后会自动发现频道。";

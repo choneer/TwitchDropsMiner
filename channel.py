@@ -161,7 +161,7 @@ class Stream:
 class Channel:
     __slots__ = (
         "_twitch", "_gui_channels", "id", "_login", "_display_name", "_spade_url",
-        "_stream", "_pending_stream_up", "acl_based"
+        "_stream", "_pending_stream_up", "acl_based", "monitor_games"
     )
 
     def __init__(
@@ -186,6 +186,7 @@ class Channel:
         # • if we're watching a non-based channel, a based channel going up triggers a switch
         # • not cleaned up unless they're streaming a game we haven't selected
         self.acl_based: bool = acl_based
+        self.monitor_games: list[str] = []
 
     @classmethod
     def from_acl(cls, twitch: Twitch, data: JsonType) -> Channel:

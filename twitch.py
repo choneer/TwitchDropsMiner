@@ -480,6 +480,13 @@ class Twitch:
         self._state_change = asyncio.Event()
         self.wanted_games: list[Game] = []
         self.inventory: list[DropsCampaign] = []
+        self._monitor_cache = {}
+        self._monitor_last = {}
+        self._monitor_classes = {}
+        self._monitor_rotation = {}
+        self.monitoring = None
+        self._monitor_force_priority = False
+        self._monitor_force_all = False
         self.discovery = {'source': 'twitch', 'status': 'not_loaded', 'updated_at': None,
                           'count': 0, 'message': '尚未获取活动'}
         self._drops: dict[str, TimedDrop] = {}
@@ -569,6 +576,10 @@ class Twitch:
         self.inventory.clear()
         self._auth_state.clear()
         self.wanted_games.clear()
+        self._monitor_cache.clear()
+        self._monitor_last.clear()
+        self._monitor_classes.clear()
+        self._monitor_rotation.clear()
         self._mnt_triggers.clear()
         # wait at least half a second + whatever it takes to complete the closing
         # this allows aiohttp to safely close the session
@@ -675,7 +686,6 @@ class Twitch:
                 "User", "Notifications", auth_state.user_id, self.process_notifications
             ),
         ])
-        full_cleanup: bool = False
         channels: Final[OrderedDict[int, Channel]] = self.channels
         self.change_state(State.INVENTORY_FETCH)
         while True:
@@ -738,164 +748,14 @@ class Twitch:
                     ):
                         # non-excluded games with no priority are placed last, below priority ones
                         self.wanted_games.append(game)
-                full_cleanup = True
                 self.restart_watching()
                 self.change_state(State.CHANNELS_CLEANUP)
             elif self._state is State.CHANNELS_CLEANUP:
-                self.gui.status.update(_("gui", "status", "cleanup"))
-                if not self.wanted_games or full_cleanup:
-                    # no games selected or we're doing full cleanup: remove everything
-                    to_remove_channels: list[Channel] = list(channels.values())
-                else:
-                    # remove all channels that:
-                    to_remove_channels = [
-                        channel
-                        for channel in channels.values()
-                        if (
-                            not channel.acl_based  # aren't ACL-based
-                            and (
-                                channel.offline  # and are offline
-                                # or online but aren't streaming the game we want anymore
-                                or (channel.game is None or channel.game not in self.wanted_games)
-                            )
-                        )
-                    ]
-                full_cleanup = False
-                if to_remove_channels:
-                    to_remove_topics: list[str] = []
-                    for channel in to_remove_channels:
-                        to_remove_topics.append(
-                            WebsocketTopic.as_str("Channel", "StreamState", channel.id)
-                        )
-                        to_remove_topics.append(
-                            WebsocketTopic.as_str("Channel", "StreamUpdate", channel.id)
-                        )
-                    self.websocket.remove_topics(to_remove_topics)
-                    for channel in to_remove_channels:
-                        del channels[channel.id]
-                        channel.remove()
-                    del to_remove_channels, to_remove_topics
-                if self.wanted_games:
-                    self.change_state(State.CHANNELS_FETCH)
-                else:
-                    # with no games available, we switch to IDLE after cleanup
-                    self.print(_("status", "no_campaign"))
-                    self.change_state(State.IDLE)
+                # Keep current subscriptions until the replacement allocation is ready.
+                self.change_state(State.CHANNELS_FETCH)
             elif self._state is State.CHANNELS_FETCH:
-                self.gui.status.update(_("gui", "status", "gathering"))
-                logger.info('开始搜索直播频道：%s', '、'.join(game.name for game in self.wanted_games) or '未选择游戏')
-                # start with all current channels, clear the memory and GUI
-                new_channels: set[Channel] = set(channels.values())
-                channels.clear()
-                self.gui.channels.clear()
-                # gather and add ACL channels from campaigns
-                # NOTE: we consider only campaigns that can be progressed
-                # NOTE: we use another set so that we can set them online separately
-                no_acl: set[Game] = set()
-                acl_channels: set[Channel] = set()
-                next_hour = datetime.now(timezone.utc) + timedelta(hours=1)
-                for campaign in self.inventory:
-                    if (
-                        campaign.game in self.wanted_games
-                        and campaign.can_earn_within(next_hour)
-                    ):
-                        if campaign.allowed_channels:
-                            acl_channels.update(campaign.allowed_channels)
-                        else:
-                            no_acl.add(campaign.game)
-                # remove all ACL channels that already exist from the other set
-                acl_channels.difference_update(new_channels)
-                logger.info('正在检查 %d 个活动指定频道的在线状态', len(acl_channels))
-                # use the other set to set them online if possible
-                await self.bulk_check_online(acl_channels)
-                logger.info('指定频道检查完成：%d / %d 个在线', sum(c.online for c in acl_channels), len(acl_channels))
-                # finally, add them as new channels
-                new_channels.update(acl_channels)
-                for game in no_acl:
-                    # for every campaign without an ACL, for it's game,
-                    # add a list of live channels with drops enabled
-                    logger.info('正在搜索游戏「%s」的掉宝直播频道', game.name)
-                    found_channels = await self.get_live_streams(game, drops_enabled=True)
-                    logger.info('游戏「%s」找到 %d 个掉宝直播频道', game.name, len(found_channels))
-                    new_channels.update(found_channels)
-                # sort them descending by viewers, by priority and by game priority
-                # NOTE: Viewers sort also ensures ONLINE channels are sorted to the top
-                # NOTE: We can drop using the set now, because there's no more channels being added
-                ordered_channels: list[Channel] = sorted(
-                    new_channels, key=self._viewers_key, reverse=True
-                )
-                ordered_channels.sort(key=lambda ch: ch.acl_based, reverse=True)
-                ordered_channels.sort(key=self.get_priority)
-                # ensure that we won't end up with more channels than we can handle
-                # NOTE: we trim from the end because that's where the non-priority,
-                # offline (or online but low viewers) channels end up
-                to_remove_channels = ordered_channels[MAX_CHANNELS:]
-                ordered_channels = ordered_channels[:MAX_CHANNELS]
-                logger.info('频道筛选完成：发现 %d 个，保留 %d 个；在线 %d 个，符合观看条件 %d 个',
-                            len(new_channels), len(ordered_channels), sum(c.online for c in ordered_channels),
-                            sum(self.can_watch(c) for c in ordered_channels))
-                if to_remove_channels:
-                    # tracked channels and gui were cleared earlier, so no need to do it here
-                    # just make sure to unsubscribe from their topics
-                    to_remove_topics = []
-                    for channel in to_remove_channels:
-                        to_remove_topics.append(
-                            WebsocketTopic.as_str("Channel", "StreamState", channel.id)
-                        )
-                        to_remove_topics.append(
-                            WebsocketTopic.as_str("Channel", "StreamUpdate", channel.id)
-                        )
-                    self.websocket.remove_topics(to_remove_topics)
-                    del to_remove_channels, to_remove_topics
-                # set our new channel list
-                for channel in ordered_channels:
-                    channels[channel.id] = channel
-                    channel.display(add=True)
-                # subscribe to these channel's state updates
-                to_add_topics: list[WebsocketTopic] = []
-                for channel_id in channels:
-                    to_add_topics.append(
-                        WebsocketTopic(
-                            "Channel", "StreamState", channel_id, self.process_stream_state
-                        )
-                    )
-                    to_add_topics.append(
-                        WebsocketTopic(
-                            "Channel", "StreamUpdate", channel_id, self.process_stream_update
-                        )
-                    )
-                self.websocket.add_topics(to_add_topics)
-                # relink watching channel after cleanup,
-                # or stop watching it if it no longer qualifies
-                # NOTE: this replaces 'self.watching_channel's internal value with the new object
-                watching_channel = self.watching_channel.get_with_default(None)
-                if watching_channel is not None:
-                    new_watching: Channel | None = channels.get(watching_channel.id)
-                    if new_watching is not None and self.can_watch(new_watching):
-                        self.watch(new_watching, update_status=False)
-                    else:
-                        # we've removed a channel we were watching
-                        self.stop_watching()
-                    del new_watching
-                # pre-display the active drop with a substracted minute
-                for channel in channels.values():
-                    # check if there's any channels we can watch first
-                    if self.can_watch(channel):
-                        if (
-                            (active_campaign := self.get_active_campaign(channel)) is not None
-                            and (active_drop := active_campaign.first_drop) is not None
-                        ):
-                            active_drop.display(countdown=False, subone=True)
-                        break
+                await self._refresh_monitored_channels()
                 self.change_state(State.CHANNEL_SWITCH)
-                del (
-                    no_acl,
-                    acl_channels,
-                    new_channels,
-                    to_add_topics,
-                    ordered_channels,
-                    watching_channel,
-                )
             elif self._state is State.CHANNEL_SWITCH:
                 if self.settings.dump:
                     self.gui.close()
@@ -1017,16 +877,145 @@ class Twitch:
                         logger.log(CALL, "No active drop could be determined")
             await self._watch_sleep(interval - min(time() - last_sent, interval))
 
+    async def _refresh_monitored_channels(self):
+        from channel_monitor import (GamePool, allocate_channels, rank_candidates,
+                                     rotate_candidates, search_due, OTHER_GAMES)
+        now = time()
+        force_priority, force_all = self._monitor_force_priority, self._monitor_force_all
+        self._monitor_force_priority = self._monitor_force_all = False
+        horizon = datetime.now(timezone.utc) + timedelta(hours=1)
+        eligible = [c for c in self.inventory if c.game in self.wanted_games
+                    and c.can_earn_within(horizon)]
+        game_campaigns = {}
+        for campaign in eligible:
+            game_campaigns.setdefault(campaign.game, []).append(campaign)
+        priority = [g for name in self.settings.priority for g in game_campaigns if g.name == name]
+        other = sorted((g for g in game_campaigns if g not in priority),
+                       key=lambda g: (min(c.ends_at for c in game_campaigns[g]), g.id))[:OTHER_GAMES]
+        games = priority + other
+        game_ids = {g.id for g in games}
+        for key in list(self._monitor_cache):
+            if key not in game_ids:
+                self._monitor_cache.pop(key, None)
+                self._monitor_last.pop(key, None)
+                self._monitor_classes.pop(key, None)
+        watching = self.watching_channel.get_with_default(None)
+        watching = watching if watching is not None and self.can_watch(watching) else None
+        selected_before = self.gui.channels.get_selection()
+        pools = []
+        for game in games:
+            is_priority = game in priority
+            campaigns = game_campaigns[game]
+            acl = {channel.id: self.channels.get(channel.id, channel)
+                   for campaign in campaigns for channel in campaign.allowed_channels}
+            unrestricted = any(not c.allowed_channels for c in campaigns)
+            small_acl = bool(acl) and len(acl) <= 10 and not unrestricted
+            signature = (is_priority, tuple(sorted(acl)), unrestricted)
+            last = self._monitor_last.get(game.id)
+            if signature != self._monitor_classes.get(game.id):
+                last = None
+            if force_all or (force_priority and is_priority) or search_due(last, now, is_priority):
+                self.gui.status.update(f'搜索直播频道：{game.name}')
+                logger.info('按游戏搜索「%s」（%s，周期 %s 分钟）', game.name,
+                            '优先列表' if is_priority else '列表外', 15 if is_priority else 60)
+                limit = 40 if is_priority else 10
+                if small_acl:
+                    sample = list(acl.values())
+                else:
+                    previous = [self.channels[c.id] for c in self._monitor_cache.get(game.id, [])
+                                if c.id in self.channels and c.id in acl and self.channels[c.id].online]
+                    keep = previous[:limit // 2]
+                    offset = self._monitor_rotation.get(game.id, 0)
+                    remaining = [c for c in acl.values() if c.id not in {v.id for v in keep}]
+                    sample = keep + rotate_candidates(remaining, offset, limit - len(keep))
+                    self._monitor_rotation[game.id] = offset + max(1, limit - len(keep))
+                try:
+                    # Existing limiter still gates every GQL request. Bound each
+                    # discovery so one unavailable game cannot block all monitoring.
+                    if sample:
+                        await asyncio.wait_for(self.bulk_check_online(sample), timeout=60)
+                    candidates = sample
+                    if unrestricted:
+                        found = await asyncio.wait_for(self.get_live_streams(
+                            game, limit=20 if is_priority else 5, drops_enabled=True), timeout=60)
+                        candidates = candidates + found
+                    if watching is not None and (watching.id in acl or (unrestricted and watching.game == game)):
+                        candidates = [watching] + candidates
+                    self._monitor_cache[game.id] = rank_candidates(candidates,
+                        lambda c: self.can_watch(c) and (c.game == game or game.is_special()),
+                                                                 small_acl=small_acl)
+                    self._monitor_last[game.id] = time()
+                    self._monitor_classes[game.id] = signature
+                    logger.info('游戏「%s」指定名单 %d 个，本轮检查 %d 个，候选 %d 个，在线 %d 个',
+                                game.name, len(acl), len(sample), len(self._monitor_cache[game.id]),
+                                sum(c.online for c in self._monitor_cache[game.id]))
+                except (asyncio.TimeoutError, RequestException, GQLException, MinerException) as exc:
+                    logger.warning('游戏「%s」频道搜索失败（%s），保留上一轮候选，下个周期重试',
+                                   game.name, type(exc).__name__)
+                    # Avoid a failing endpoint being retried on every boundary event.
+                    self._monitor_last[game.id] = time()
+                    self._monitor_classes[game.id] = signature
+            candidates = self._monitor_cache.get(game.id, [])
+            pools.append(GamePool(game.id, game.name, is_priority, candidates, small_acl))
+        latest_watching = self.watching_channel.get_with_default(None)
+        watching = latest_watching if latest_watching is not None and self.can_watch(latest_watching) else None
+        ordered, assigned = allocate_channels(pools, MAX_CHANNELS, watching)
+        # Use the same live object for shared channels, so websocket updates don't
+        # leave stale clones in other games' cached candidate lists.
+        canonical = {c.id: c for c in ordered}
+        if watching is not None:
+            canonical[watching.id] = watching
+        for game_id, candidates in self._monitor_cache.items():
+            self._monitor_cache[game_id] = [canonical.get(c.id, c) for c in candidates]
+        ordered = [canonical[c.id] for c in ordered]
+        keep_ids = set(canonical)
+        removed = [c for c in self.channels.values() if c.id not in keep_ids]
+        topics = [WebsocketTopic.as_str('Channel', kind, c.id)
+                  for c in removed for kind in ('StreamState', 'StreamUpdate')]
+        self.websocket.remove_topics(topics)
+        for channel in removed:
+            channel.remove()
+        self.channels.clear()
+        self.gui.channels.clear()
+        summaries = []
+        for pool in pools:
+            ids = assigned[pool.game_id]
+            summaries.append({'game': pool.name, 'priority': pool.priority,
+                              'tracked': len(ids), 'channels': [str(i) for i in ids],
+                              'search_interval_minutes': 15 if pool.priority else 60})
+            logger.info('监听配额「%s」：保留 %d 个，在线 %d 个；%s', pool.name, len(ids),
+                        sum(canonical[i].online for i in ids),
+                        '小型指定名单完整保留' if pool.small_acl and len(ids) == len(pool.channels)
+                        else '按游戏配额分配')
+        for channel in ordered:
+            channel.monitor_games = [p.name for p in pools if channel.id in assigned[p.game_id]]
+            self.channels[channel.id] = channel
+            channel.display(add=True)
+        self.websocket.add_topics([WebsocketTopic('Channel', kind, c.id, callback)
+            for c in ordered for kind, callback in (('StreamState', self.process_stream_state),
+                                                    ('StreamUpdate', self.process_stream_update))])
+        if selected_before is not None and selected_before.id in self.channels and hasattr(self.gui.channels, 'selected'):
+            self.gui.channels.selected = self.channels[selected_before.id]
+        if watching is not None and watching.id in self.channels:
+            self.watch(self.channels[watching.id], update_status=False)
+        else:
+            self.stop_watching()
+        self.monitoring = {'tracked': len(ordered), 'limit': MAX_CHANNELS, 'games': summaries,
+                           'priority_interval_minutes': 15, 'other_interval_minutes': 60}
+        logger.info('频道分配完成：监听 %d / %d 个，优先列表 %d 个游戏，列表外 %d 个游戏；其余列表外游戏待下轮截止时间排序',
+                    len(ordered), MAX_CHANNELS, len(priority), len(other))
+
     @task_wrapper(critical=True)
     async def _maintenance_task(self) -> None:
         now = datetime.now(timezone.utc)
         next_period = now + timedelta(hours=1)
+        next_priority = now + timedelta(minutes=15)
         while True:
             # exit if there's no need to repeat the loop
             now = datetime.now(timezone.utc)
             if now >= next_period:
                 break
-            next_trigger = next_period
+            next_trigger = min(next_period, next_priority)
             while self._mnt_triggers and self._mnt_triggers[0] <= next_trigger:
                 next_trigger = self._mnt_triggers.popleft()
             trigger_type: str = "Reload" if next_trigger == next_period else "Cleanup"
@@ -1042,11 +1031,16 @@ class Twitch:
             now = datetime.now(timezone.utc)
             if now >= next_period:
                 break
+            if now >= next_priority:
+                next_priority = now + timedelta(minutes=15)
+                self._monitor_force_priority = True
+                logger.info('15 分钟优先列表搜索周期到达，重新分配监听频道；列表外沿用小时缓存')
             if next_trigger != next_period:
                 logger.log(CALL, "Maintenance task requests channels cleanup")
                 self.change_state(State.CHANNELS_CLEANUP)
         # this triggers a restart of this task every (up to) 60 minutes
         logger.log(CALL, "Maintenance task requests a reload")
+        self._monitor_force_all = True
         self.change_state(State.INVENTORY_FETCH)
 
     def can_watch(self, channel: Channel) -> bool:
