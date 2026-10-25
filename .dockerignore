@@ -7,4 +7,6 @@
 !docker/**
 docker/*.secret
 docker/.env
+docker/data
+docker/data/**
 **/__pycache__

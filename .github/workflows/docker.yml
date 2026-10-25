@@ -7,10 +7,14 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   image:
     if: github.repository == 'choneer/TwitchDropsMiner'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
