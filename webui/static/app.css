@@ -737,6 +737,14 @@ main {
   display: flex;
   gap: 10px;
 }
+.inline-form input {
+  flex: 1;
+  min-width: 0;
+}
+.inline-form button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .priority-list {
   padding: 0;
   list-style: none;
