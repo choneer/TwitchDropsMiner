@@ -7,10 +7,13 @@ if [ ! -s "$WEB_PASSWORD_FILE" ]; then
     echo 'Missing WEB_PASSWORD_FILE: mount a strong password as a Docker secret.' >&2
     exit 1
 fi
-if [ "$(wc -c < "$WEB_PASSWORD_FILE")" -lt 16 ]; then
-    echo 'Web password must contain at least 16 bytes.' >&2
-    exit 1
-fi
+/opt/venv/bin/python - "$WEB_PASSWORD_FILE" <<'PY'
+from pathlib import Path
+import sys
+password = Path(sys.argv[1]).read_bytes().removesuffix(b'\n')
+if not 16 <= len(password) <= 72 or any(c < 32 or c > 126 for c in password):
+    raise SystemExit('Web password must be one line of 16-72 printable ASCII bytes.')
+PY
 mkdir -p /run/tdm /data/cache
 chown miner:miner /data /data/cache
 chmod 700 /data

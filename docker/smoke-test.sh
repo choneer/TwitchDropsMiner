@@ -35,6 +35,8 @@ test "$ready" = true
 docker exec -i "$name" /opt/venv/bin/python - <<'PY'
 import base64
 import socket
+import os
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -47,6 +49,13 @@ assert constants.SETTINGS_PATH == Path('/data/settings.json')
 assert constants.COOKIES_PATH == Path('/data/cookies.jar')
 assert constants.LANG_PATH == Path('/opt/tdm/lang')
 assert constants.LANG_PATH.is_dir()
+desktop_env = dict(os.environ)
+desktop_env.pop('TDM_DATA_DIR', None)
+subprocess.run([sys.executable, '-c',
+    "import sys; sys.path.insert(0, '/opt/tdm'); sys.argv[0]='/opt/tdm/main.py'; "
+    "import constants; assert constants.DATA_DIR == constants.WORKING_DIR; "
+    "assert constants.COOKIES_PATH == constants.WORKING_DIR / 'cookies.jar'"],
+    env=desktop_env, check=True)
 opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 for path in ('/vnc.html', '/websockify'):
     try:

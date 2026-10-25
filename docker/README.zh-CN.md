@@ -20,7 +20,7 @@ docker compose up -d --build
 
 发布镜像可用后，使用 `docker compose pull && docker compose up -d --no-build`。
 浏览器打开 `http://NAS-IP:5800`，HTTP 认证用户名固定为 `admin`，
-密码为 `web-password.secret` 的第一行。随后在 GUI 中完成 Twitch 设备授权，
+密码为 `web-password.secret` 中的单行内容（16–72 个可打印 ASCII 字符）。随后在 GUI 中完成 Twitch 设备授权，
 选择中文、游戏优先级，按 Reload。游戏账号关联需在 Twitch 官方页面完成。
 默认没有设置游戏，不会擅自选择活动。关闭浏览器不影响容器运行。
 
